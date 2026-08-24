@@ -3,8 +3,3 @@
 **/.DS_Store
 .AppleDouble
 .LSOverride
-
-# Local IDE / editor (machine-specific)
-.cursor/
-.vscode/
-.agents/
