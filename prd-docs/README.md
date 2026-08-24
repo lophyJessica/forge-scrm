@@ -6,14 +6,14 @@
 
 | 文档 | 状态 |
 |---|---|
-| 主PRD.md | ✅ 已定稿（首轮 7+1 项已回收；后续未决项单独跟踪） |
+| 主PRD.md | ✅ 已定稿（首轮 7+1、第二轮 9 项均已回写） |
 | 核心字段清单.md | ✅ 完成（MVP 实体 + 明确标注的待确认扩展实体） |
-| mvp验收清单.md | ✅ 完成（43 条 Must + 1 条 Should） |
-| modules/01-资料库PRD.md | ✅ 初稿 |
-| modules/02-选题库PRD.md | ✅ 初稿 |
-| modules/03-脚本库PRD.md | ✅ 初稿 |
-| modules/04-数据分析PRD.md | ✅ 初稿 |
-| modules/05-权限与账号PRD.md | ✅ 初稿 |
+| mvp验收清单.md | ✅ 完成（45 条 Must + 1 条架构预留） |
+| modules/01-资料库PRD.md | ✅ 已定稿 |
+| modules/02-选题库PRD.md | ✅ 已定稿 |
+| modules/03-脚本库PRD.md | ✅ 已定稿 |
+| modules/04-数据分析PRD.md | ✅ 已定稿 |
+| modules/05-权限与账号PRD.md | ✅ 已定稿 |
 
 ## 规则
 
