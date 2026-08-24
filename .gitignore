@@ -3,3 +3,24 @@
 **/.DS_Store
 .AppleDouble
 .LSOverride
+
+# 环境变量与密钥（红线：DEEPSEEK_API_KEY / JWT_SECRET 只允许存在于本地 .env）
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# 本地数据与文件留档（D-T4）
+backend/data/
+*.db
+*.sqlite3
+
+# 前端
+node_modules/
+dist/
+.vite/
