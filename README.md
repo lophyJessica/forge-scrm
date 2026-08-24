@@ -1,6 +1,6 @@
 # Forge SCRM
 
-姐夫新媒体运营系统（SCRM：Social/Content Relationship Management）的需求、产品文档与后续系统实现仓库。
+Forge 新媒体运营系统（SCRM：Social/Content Relationship Management）的需求、产品文档与后续系统实现仓库。
 
 ## 当前阶段
 

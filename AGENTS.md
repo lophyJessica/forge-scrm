@@ -1,11 +1,11 @@
-# AGENTS.md — forge-scrm（姐夫新媒体运营系统）
+# AGENTS.md — forge-scrm（Forge 新媒体运营系统）
 
 > 本文件是给 AI 编码/文档 Agent（Codex / 反gravity / WorkBuddy / Cursor）的**项目守则**。
 > 在这个仓库里干活前，先读本文件 + context/ 相关文档。
 
 ## 项目是什么
 
-姐夫（账号操盘手）的新媒体运营系统：围绕视频号/小红书，把"资料 → 选题 → 脚本 → 发布 → 数据 → 洞察"串成闭环，核心是 AI（DeepSeek）批量生成选题/脚本 + 数据分析回写。
+操盘手的新媒体运营系统：围绕视频号/小红书，把"资料 → 选题 → 脚本 → 发布 → 数据 → 洞察"串成闭环，核心是 AI（DeepSeek）批量生成选题/脚本 + 数据分析回写。
 
 三板块：**资料库 + 选题/脚本库 + 数据分析**。一期桌面端（电脑），手机端二期。客户：中小微企业主，内容方向：企业线上营销与获客。
 
@@ -18,7 +18,7 @@ context/ > templates/ > prd-docs/ > draft/
 - **context/**：已确认的业务事实、规则、字段口径（SSOT，唯一事实源）。AI 生成/修改任何内容必须先读这里，**禁止与 context 冲突**。
 - **templates/**：PRD 模板（prd-template.md），生成 PRD 按模板结构。
 - **prd-docs/**：正式 PRD（主PRD + modules/ 模块PRD + 核心字段清单 + mvp验收清单）。
-- **draft/**：未确认的草稿、待姐夫确认的问题、中间态文档。
+- **draft/**：未确认的草稿、待调研者确认的问题、中间态文档。
 - **requirements/**：调研过程资料（问卷、调研结论、平台调研），历史存档，不常改。
 - **check-reports/**：AI 自检报告存档。
 - **prompt/**：给各 Agent 的常用指令存档。

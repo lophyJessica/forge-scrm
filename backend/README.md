@@ -1,6 +1,6 @@
 # forge-scrm 后端（一期）
 
-姐夫新媒体运营系统一期后端：FastAPI + SQLAlchemy 2.x + Alembic。
+Forge 新媒体运营系统一期后端：FastAPI + SQLAlchemy 2.x + Alembic。
 本地开发用 SQLite（兼容模式），**DDL 以 MySQL 为标准**，VPS 部署时只换 `DATABASE_URL` 即切 MySQL。
 
 ## 1. 环境要求

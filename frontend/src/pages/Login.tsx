@@ -34,7 +34,7 @@ export default function Login() {
     >
       <Card style={{ width: 380 }}>
         <Typography.Title level={4} style={{ textAlign: 'center' }}>
-          姐夫新媒体运营系统
+          Forge 新媒体运营系统
         </Typography.Title>
         <Typography.Paragraph type="secondary" style={{ textAlign: 'center' }}>
           账号密码登录（一期不支持扫码/验证码）

@@ -95,7 +95,7 @@ export default function MainLayout() {
     <Layout style={{ minHeight: '100vh' }}>
       <Sider width={220} theme="dark">
         <div style={{ color: '#fff', padding: '18px 16px', fontSize: 16, fontWeight: 600 }}>
-          姐夫新媒体运营系统
+          Forge 新媒体运营系统
         </div>
         <Menu
           theme="dark"

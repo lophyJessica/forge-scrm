@@ -5,7 +5,7 @@
 
 ## 一、登录 `/login`
 
-- 页面居中 Card，标题“姐夫新媒体运营系统”。
+- 页面居中 Card，标题“Forge 新媒体运营系统”。
 - 说明文字：账号密码登录，一期不支持扫码/验证码。
 - 表单：账号 Input、密码 Password、登录按钮。
 - 登录调用 auth store；成功后若 `must_change_password` 为 true，提示尽快修改密码，并跳 `/`。

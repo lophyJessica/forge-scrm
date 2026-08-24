@@ -26,7 +26,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="姐夫新媒体运营系统 API",
+    title="Forge 新媒体运营系统 API",
     description="forge-scrm 一期后端（资料库 / 选题库 / 脚本库 / 数据分析 / 权限账号）",
     version="1.0.0",
     lifespan=lifespan,
