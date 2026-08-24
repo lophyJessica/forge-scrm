@@ -44,7 +44,7 @@ echo "===== [5/5] 线上验证 ====="
 sleep 3
 echo "首页: $(curl -s -o /dev/null -w '%{http_code}' -m 10 $DOMAIN/)"
 echo "title: $(curl -s -m 10 $DOMAIN/ | grep -o '<title>[^<]*</title>' | head -1)"
-echo "API:  $(curl -s -o /dev/null -w '%{http_code}' -m 10 $DOMAIN/api/login)（POST 登录接口探测，405=可达，404=未通）"
+echo "API:  $(curl -s -o /dev/null -w '%{http_code}' -m 10 -X POST $DOMAIN/api/auth/login -H 'Content-Type: application/json' -d '{}')（登录接口探测，422=可达，404=未通）"
 
 echo ""
 echo "===== 部署完成 ====="
