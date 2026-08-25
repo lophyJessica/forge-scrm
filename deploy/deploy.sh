@@ -33,6 +33,7 @@ echo "===== [3/6] rsync 后端源码 → 新机 ====="
 rsync -avz -e "ssh -i $SSH_KEY -p $VPS_PORT" --delete \
   --exclude='__pycache__' --exclude='*.pyc' --exclude='.venv' \
   --exclude='venv' --exclude='data/' --exclude='.DS_Store' --exclude='*.db' \
+  --exclude='.env' \
   ../backend/ "root@$VPS_HOST:$REMOTE_DIR/backend/" 2>&1 | tail -3
 
 echo "===== [4/6] 重启后端 + 刷新 nginx ====="
@@ -50,7 +51,7 @@ ssh "${SSH_OPTS[@]}" "root@$VPS_HOST" "
 
 echo "===== [5/6] 线上升级数据库（仅在需要时） ====="
 ssh "${SSH_OPTS[@]}" "root@$VPS_HOST" "
-  cd $REMOTE_DIR/backend && (alembic upgrade head 2>/dev/null || echo 'alembic 跳过（无迁移或未配置）')
+  cd $REMOTE_DIR/backend && (.venv/bin/alembic upgrade head 2>&1 || echo 'alembic 失败，请检查 venv 与 DATABASE_URL')
 "
 
 echo "===== [6/6] 线上验证 ====="

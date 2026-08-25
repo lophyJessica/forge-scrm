@@ -50,6 +50,7 @@ def _register_routers() -> None:
     from app.routers import (
         analysis,
         auth,
+        directions,
         materials,
         meta,
         prompts,
@@ -58,7 +59,7 @@ def _register_routers() -> None:
         users,
     )
 
-    for module in (auth, users, meta, materials, topics, scripts, analysis, prompts):
+    for module in (auth, users, meta, materials, topics, scripts, analysis, prompts, directions):
         app.include_router(module.router)
 
 

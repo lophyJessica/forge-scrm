@@ -15,6 +15,7 @@ from app.models.analysis import (
 from app.models.base import Base
 from app.models.material import Material, MaterialClass, MaterialTag, Tag
 from app.models.prompt import PromptTemplate
+from app.models.direction import BusinessDirection, Specialty
 from app.models.script import Script, ScriptVersion
 from app.models.topic import Topic, TopicMaterial
 from app.models.user import User
@@ -27,6 +28,8 @@ __all__ = [
     "Tag",
     "MaterialTag",
     "PromptTemplate",
+    "BusinessDirection",
+    "Specialty",
     "Topic",
     "TopicMaterial",
     "Script",

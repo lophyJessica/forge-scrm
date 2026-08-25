@@ -29,9 +29,18 @@ function readCollapsed(): boolean {
   return stored === null ? true : stored === 'true'
 }
 
-function parentKeyForPath(path: string, menuKeys: string[]): string | undefined {
+interface MenuGroup {
+  key: string
+  children?: Array<{ key: string }>
+}
+
+function parentKeyForPath(path: string, menuGroups: MenuGroup[]): string | undefined {
   if (path === '/') return undefined
-  return menuKeys.find((key) => path.startsWith(`/${key}`) || path === key)
+  return menuGroups.find(
+    ({ key, children }) =>
+      path.startsWith(`/${key}`) ||
+      children?.some(({ key: childKey }) => path === childKey || path.startsWith(`${childKey}/`)),
+  )?.key
 }
 
 export default function MainLayout() {
@@ -118,16 +127,14 @@ export default function MainLayout() {
     [moduleItems],
   )
 
-  const moduleKeys = useMemo(() => moduleItems.map((i) => i.key), [moduleItems])
-
   useEffect(() => {
     if (collapsed) {
       setOpenKeys([])
       return
     }
-    const parent = parentKeyForPath(location.pathname, moduleKeys)
+    const parent = parentKeyForPath(location.pathname, moduleItems)
     setOpenKeys(parent ? [parent] : [])
-  }, [collapsed, location.pathname, moduleKeys])
+  }, [collapsed, location.pathname, moduleItems])
 
   const toggleCollapsed = () => {
     const next = !collapsed

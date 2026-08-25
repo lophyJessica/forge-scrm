@@ -51,7 +51,8 @@ let localIdSeq = 1000
 export default function TopicGenerate() {
   const [form] = Form.useForm()
   const navigate = useNavigate()
-  const specialtyEnums = useMetaStore((s) => s.options('specialty'))
+  const options = useMetaStore((s) => s.options)
+  const specialtyEnums = options('specialty')
   const [materials, setMaterials] = useState<MaterialOut[]>([])
   const [templates, setTemplates] = useState<PromptTemplateOut[]>([])
   const [loading, setLoading] = useState(false)
@@ -87,12 +88,17 @@ export default function TopicGenerate() {
         }
         if (data.specialties?.length) {
           setSpecialties(
-            data.specialties.map((s) => ({
-              id: s.id,
-              business_direction_id: s.business_direction_id,
-              name: s.name,
-              enumValue: s.enumValue || s.name,
-            })),
+            data.specialties.map((s) => {
+              const staticMatch = STATIC_SPECIALTIES.find(
+                (item) => item.business_direction_id === s.business_direction_id && item.name === s.name,
+              )
+              return {
+                id: s.id,
+                business_direction_id: s.business_direction_id,
+                name: s.name,
+                enumValue: s.enumValue || staticMatch?.enumValue || '市场营销',
+              }
+            }),
           )
         }
       } catch {
