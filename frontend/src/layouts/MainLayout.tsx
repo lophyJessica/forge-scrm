@@ -1,13 +1,16 @@
-/** 主框架：侧边菜单（按角色/权限过滤）+ 顶栏 + 路由出口。 */
-import { useEffect, useMemo } from 'react'
+/** 主框架：侧边菜单（默认折叠 + 记忆）+ 顶栏 + 路由出口。 */
+import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Alert, Avatar, Dropdown, Layout, Menu, Tag, Typography } from 'antd'
+import { Alert, Avatar, Dropdown, Layout, Menu, Space, Tag, Typography } from 'antd'
 import {
   BarChartOutlined,
   BookOutlined,
   BulbOutlined,
   FileTextOutlined,
+  HomeOutlined,
   LogoutOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
   SettingOutlined,
   TeamOutlined,
   UserOutlined,
@@ -17,17 +20,33 @@ import { useMetaStore } from '@/store/meta'
 
 const { Header, Sider, Content } = Layout
 
+const SIDER_COLLAPSED_KEY = 'scrm_sider_collapsed'
+const SIDER_WIDTH = 220
+const SIDER_COLLAPSED_WIDTH = 64
+
+function readCollapsed(): boolean {
+  const stored = localStorage.getItem(SIDER_COLLAPSED_KEY)
+  return stored === null ? true : stored === 'true'
+}
+
+function parentKeyForPath(path: string, menuKeys: string[]): string | undefined {
+  if (path === '/') return undefined
+  return menuKeys.find((key) => path.startsWith(`/${key}`) || path === key)
+}
+
 export default function MainLayout() {
   const { user, token, logout, isAdmin, mustChangePassword } = useAuthStore()
   const loadMeta = useMetaStore((s) => s.load)
   const location = useLocation()
   const navigate = useNavigate()
+  const [collapsed, setCollapsed] = useState(readCollapsed)
+  const [openKeys, setOpenKeys] = useState<string[]>([])
 
   useEffect(() => {
     if (token) void loadMeta()
   }, [token, loadMeta])
 
-  const items = useMemo(() => {
+  const moduleItems = useMemo(() => {
     const base = [
       {
         key: 'materials',
@@ -87,21 +106,71 @@ export default function MainLayout() {
     return base
   }, [isAdmin])
 
+  const items = useMemo(
+    () => [
+      {
+        key: '/',
+        icon: <HomeOutlined />,
+        label: <Link to="/">首页</Link>,
+      },
+      ...moduleItems,
+    ],
+    [moduleItems],
+  )
+
+  const moduleKeys = useMemo(() => moduleItems.map((i) => i.key), [moduleItems])
+
+  useEffect(() => {
+    if (collapsed) {
+      setOpenKeys([])
+      return
+    }
+    const parent = parentKeyForPath(location.pathname, moduleKeys)
+    setOpenKeys(parent ? [parent] : [])
+  }, [collapsed, location.pathname, moduleKeys])
+
+  const toggleCollapsed = () => {
+    const next = !collapsed
+    setCollapsed(next)
+    localStorage.setItem(SIDER_COLLAPSED_KEY, String(next))
+    if (next) setOpenKeys([])
+  }
+
   if (!token) return <Navigate to="/login" replace />
 
-  const openKeys = items.map((i) => i.key)
+  const selectedKey = location.pathname === '/' ? '/' : location.pathname
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Sider width={220} theme="dark">
-        <div style={{ color: '#fff', padding: '18px 16px', fontSize: 16, fontWeight: 600 }}>
-          Forge 新媒体运营系统
+      <Sider
+        collapsible
+        collapsed={collapsed}
+        trigger={null}
+        width={SIDER_WIDTH}
+        collapsedWidth={SIDER_COLLAPSED_WIDTH}
+        theme="dark"
+      >
+        <div
+          style={{
+            color: '#fff',
+            padding: collapsed ? '18px 8px' : '18px 16px',
+            fontSize: collapsed ? 12 : 16,
+            fontWeight: 600,
+            textAlign: collapsed ? 'center' : 'left',
+            whiteSpace: collapsed ? 'normal' : 'nowrap',
+            lineHeight: 1.4,
+          }}
+        >
+          {collapsed ? 'Forge' : 'Forge 新媒体运营系统'}
         </div>
         <Menu
           theme="dark"
           mode="inline"
-          selectedKeys={[location.pathname]}
-          defaultOpenKeys={openKeys}
+          selectedKeys={[selectedKey]}
+          openKeys={collapsed ? [] : openKeys}
+          onOpenChange={(keys) => {
+            if (!collapsed) setOpenKeys(keys as string[])
+          }}
           items={items}
         />
       </Sider>
@@ -110,39 +179,48 @@ export default function MainLayout() {
           style={{
             background: '#fff',
             display: 'flex',
-            justifyContent: 'flex-end',
+            justifyContent: 'space-between',
             alignItems: 'center',
-            gap: 12,
             paddingInline: 24,
           }}
         >
-          <Tag color={user?.role === '管理员' ? 'gold' : 'blue'}>{user?.role}</Tag>
-          <Dropdown
-            menu={{
-              items: [
-                {
-                  key: 'profile',
-                  icon: <SettingOutlined />,
-                  label: '修改密码',
-                  onClick: () => navigate('/profile'),
-                },
-                {
-                  key: 'logout',
-                  icon: <LogoutOutlined />,
-                  label: '退出登录',
-                  onClick: async () => {
-                    await logout()
-                    navigate('/login')
-                  },
-                },
-              ],
-            }}
-          >
-            <span style={{ cursor: 'pointer' }}>
-              <Avatar size="small" icon={<UserOutlined />} />{' '}
-              <Typography.Text>{user?.username}</Typography.Text>
+          <Space>
+            <span style={{ cursor: 'pointer', fontSize: 18 }} onClick={toggleCollapsed}>
+              {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
             </span>
-          </Dropdown>
+            <Typography.Text type="secondary">
+              {location.pathname === '/' ? '首页' : location.pathname}
+            </Typography.Text>
+          </Space>
+          <Space>
+            <Tag color={user?.role === '管理员' ? 'gold' : 'blue'}>{user?.role}</Tag>
+            <Dropdown
+              menu={{
+                items: [
+                  {
+                    key: 'profile',
+                    icon: <SettingOutlined />,
+                    label: '修改密码',
+                    onClick: () => navigate('/profile'),
+                  },
+                  {
+                    key: 'logout',
+                    icon: <LogoutOutlined />,
+                    label: '退出登录',
+                    onClick: async () => {
+                      await logout()
+                      navigate('/login')
+                    },
+                  },
+                ],
+              }}
+            >
+              <span style={{ cursor: 'pointer' }}>
+                <Avatar size="small" icon={<UserOutlined />} />{' '}
+                <Typography.Text>{user?.username}</Typography.Text>
+              </span>
+            </Dropdown>
+          </Space>
         </Header>
         <Content style={{ margin: 16 }}>
           {mustChangePassword && (

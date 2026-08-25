@@ -2,6 +2,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import MainLayout from '@/layouts/MainLayout'
 import RequireAdmin from '@/components/RequireAdmin'
+import Home from '@/pages/Home'
 import Login from '@/pages/Login'
 import Profile from '@/pages/Profile'
 import MaterialList from '@/pages/materials/MaterialList'
@@ -33,7 +34,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route element={<MainLayout />}>
-        <Route path="/" element={<Navigate to="/materials" replace />} />
+        <Route path="/" element={<Home />} />
 
         {/* 模块 01 资料库 */}
         <Route path="/materials" element={<MaterialList />} />
