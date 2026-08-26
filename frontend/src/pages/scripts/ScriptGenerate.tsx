@@ -95,7 +95,7 @@ export default function ScriptGenerate() {
 
   return (
     <Space direction="vertical" style={{ width: '100%' }} size={16}>
-      <Card title="基于选题生成脚本">
+      <Card title="基于选题生成脚本" style={{ width: '100%' }}>
         <Alert
           type="info"
           showIcon
@@ -105,7 +105,7 @@ export default function ScriptGenerate() {
         <Form
           form={form}
           layout="vertical"
-          style={{ maxWidth: 720 }}
+          style={{ width: '100%', maxWidth: 720 }}
           initialValues={{ version_count: 3, content_elements: [], prompt_mode: 'builtin', builtin_prompt_type: '脚本生成' }}
         >
           <Form.Item name="topic_id" label="来源选题（仅「已选定」）" rules={[{ required: true }]}>

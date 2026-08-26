@@ -259,7 +259,7 @@ export default function TopicGenerate() {
 
   return (
     <Space direction="vertical" style={{ width: '100%' }} size={16}>
-      <Card title="批量生成选题">
+      <Card title="批量生成选题" style={{ width: '100%' }}>
         <Alert
           type="info"
           showIcon
@@ -270,7 +270,7 @@ export default function TopicGenerate() {
           form={form}
           layout="vertical"
           initialValues={{ count: 10, prompt_mode: 'builtin', builtin_prompt_type: '选题生成' }}
-          style={{ maxWidth: 720 }}
+          style={{ width: '100%', maxWidth: 720 }}
         >
           <Form.Item name="direction" hidden rules={[{ required: true }]}>
             <Input />
