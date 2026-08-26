@@ -1,7 +1,7 @@
-/** 主框架：侧边菜单（默认折叠 + 记忆）+ 顶栏 + 路由出口。 */
+/** 主框架：侧边菜单 + 顶栏标题 + 路由出口，右侧顶栏与正文同一块白底。 */
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Alert, Avatar, Breadcrumb, Dropdown, Layout, Menu, Space, Tag, Typography } from 'antd'
+import { Alert, Avatar, Dropdown, Layout, Menu, Tag, Typography } from 'antd'
 import {
   BarChartOutlined,
   BookOutlined,
@@ -24,12 +24,22 @@ import { useMetaStore } from '@/store/meta'
 const { Header, Sider, Content } = Layout
 
 const SIDER_COLLAPSED_KEY = 'scrm_sider_collapsed'
-const SIDER_WIDTH = 220
+const SIDER_WIDTH = 256
 const SIDER_COLLAPSED_WIDTH = 64
 
+function BrandMark() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3 10 12 4l9 6" />
+      <path d="M5 9v11h14V9" />
+      <path d="M8 13h8" />
+      <path d="M8 17h8" />
+    </svg>
+  )
+}
+
 function readCollapsed(): boolean {
-  const stored = localStorage.getItem(SIDER_COLLAPSED_KEY)
-  return stored === null ? true : stored === 'true'
+  return localStorage.getItem(SIDER_COLLAPSED_KEY) === 'true'
 }
 
 interface MenuRouteDefinition {
@@ -100,6 +110,7 @@ const NAV_GROUPS: MenuGroupDefinition[] = [
       { key: '/analysis/data-sources', label: '数据源管理' },
       { key: '/analysis/raw-data', label: '原始数据' },
       { key: '/analysis/tasks', label: '分析任务' },
+      { key: '/reports', label: '数据报告' },
     ],
   },
 ]
@@ -152,6 +163,7 @@ const DETAIL_ROUTES: BreadcrumbRouteDefinition[] = [
   { match: /^\/scripts\/[^/]+\/edit$/, label: '修改脚本', groupKey: 'scripts' },
   { match: /^\/scripts\/[^/]+$/, label: '脚本详情', groupKey: 'scripts' },
   { match: /^\/analysis\/tasks\/[^/]+$/, label: '分析任务详情', groupKey: 'analysis' },
+  { match: /^\/reports\/[^/]+$/, label: '报告详情', groupKey: 'analysis' },
   { match: /^\/research\/reports\/[^/]+$/, label: '研究报告', groupKey: 'research' },
   { path: '/profile', label: '修改密码' },
 ]
@@ -164,15 +176,9 @@ function routeDefinitionForPath(path: string): BreadcrumbRouteDefinition | undef
   return DETAIL_ROUTES.find((route) => route.path === path || route.match?.test(path))
 }
 
-function breadcrumbItemsForPath(path: string) {
-  if (path === '/') return []
-  const route = routeDefinitionForPath(path)
-  if (!route) return []
-  const group = route.groupKey ? ALL_NAV_GROUPS.find(({ key }) => key === route.groupKey) : undefined
-  return [
-    ...(group ? [{ title: <Link to={group.parentPath}>{group.label}</Link> }] : []),
-    { title: route.label },
-  ]
+function pageTitleForPath(path: string) {
+  if (path === '/') return '首页'
+  return routeDefinitionForPath(path)?.label || 'Forge'
 }
 
 function parentKeyForPath(path: string, menuGroups: MenuGroupDefinition[]): string | undefined {
@@ -184,13 +190,23 @@ function parentKeyForPath(path: string, menuGroups: MenuGroupDefinition[]): stri
   )?.key
 }
 
+function selectedMenuKey(path: string, menuGroups: MenuGroupDefinition[]): string {
+  if (path === '/') return '/'
+  const leafKeys = menuGroups.flatMap((group) => group.children.map((child) => child.key))
+  if (leafKeys.includes(path)) return path
+  const prefixed = leafKeys
+    .filter((key) => path === key || path.startsWith(`${key}/`))
+    .sort((a, b) => b.length - a.length)
+  return prefixed[0] || path
+}
+
 export default function MainLayout() {
   const { user, token, logout, isAdmin, mustChangePassword } = useAuthStore()
   const loadMeta = useMetaStore((s) => s.load)
   const location = useLocation()
   const navigate = useNavigate()
   const [collapsed, setCollapsed] = useState(readCollapsed)
-  const [openKeys, setOpenKeys] = useState<string[]>([])
+  const [openKeys, setOpenKeys] = useState<string[]>(() => ALL_NAV_GROUPS.map((group) => group.key))
 
   useEffect(() => {
     if (token) void loadMeta()
@@ -206,10 +222,11 @@ export default function MainLayout() {
         label: group.label,
         children: group.children.map((route) => ({
           key: route.key,
-          label: <Link to={route.key}>{route.label}</Link>,
+          label: route.label,
+          onClick: () => navigate(route.key),
         })),
       })),
-    [visibleGroups],
+    [visibleGroups, navigate],
   )
 
   const items = useMemo(
@@ -217,11 +234,12 @@ export default function MainLayout() {
       {
         key: '/',
         icon: <HomeOutlined />,
-        label: <Link to="/">首页</Link>,
+        label: '首页',
+        onClick: () => navigate('/'),
       },
       ...moduleItems,
     ],
-    [moduleItems],
+    [moduleItems, navigate],
   )
 
   useEffect(() => {
@@ -230,7 +248,11 @@ export default function MainLayout() {
       return
     }
     const parent = parentKeyForPath(location.pathname, visibleGroups)
-    setOpenKeys(parent ? [parent] : [])
+    setOpenKeys((current) => {
+      const base = current.length ? current : visibleGroups.map((group) => group.key)
+      if (parent && !base.includes(parent)) return [...base, parent]
+      return base
+    })
   }, [collapsed, location.pathname, visibleGroups])
 
   const toggleCollapsed = () => {
@@ -242,12 +264,13 @@ export default function MainLayout() {
 
   if (!token) return <Navigate to="/login" replace />
 
-  const selectedKey = location.pathname === '/' ? '/' : location.pathname
-  const breadcrumbItems = breadcrumbItemsForPath(location.pathname)
+  const selectedKey = selectedMenuKey(location.pathname, visibleGroups)
+  const pageTitle = pageTitleForPath(location.pathname)
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
+    <Layout className="forge-shell">
       <Sider
+        className="forge-sider"
         collapsible
         collapsed={collapsed}
         trigger={null}
@@ -255,52 +278,41 @@ export default function MainLayout() {
         collapsedWidth={SIDER_COLLAPSED_WIDTH}
         theme="dark"
       >
-        <div
-          style={{
-            color: '#fff',
-            padding: collapsed ? '18px 8px' : '18px 16px',
-            fontSize: collapsed ? 12 : 16,
-            fontWeight: 600,
-            textAlign: collapsed ? 'center' : 'left',
-            whiteSpace: collapsed ? 'normal' : 'nowrap',
-            lineHeight: 1.4,
-          }}
-        >
-          {collapsed ? 'Forge' : 'Forge 新媒体运营系统'}
+        <div className="forge-sider-brand">
+          <span className="forge-sider-logo">
+            <BrandMark />
+          </span>
+          {!collapsed && <strong>Forge SCRM</strong>}
         </div>
-        <Menu
-          theme="dark"
-          mode="inline"
-          selectedKeys={[selectedKey]}
-          openKeys={collapsed ? [] : openKeys}
-          onOpenChange={(keys) => {
-            if (!collapsed) setOpenKeys(keys as string[])
-          }}
-          items={items}
-        />
-      </Sider>
-      <Layout>
-        <Header
-          style={{
-            background: '#fff',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            paddingInline: 24,
-          }}
+        <nav className="forge-sider-nav" aria-label="主导航">
+          <Menu
+            className="forge-sider-menu"
+            theme="dark"
+            mode="inline"
+            inlineIndent={8}
+            selectedKeys={[selectedKey]}
+            openKeys={collapsed ? [] : openKeys}
+            onOpenChange={(keys) => {
+              if (!collapsed) setOpenKeys(keys as string[])
+            }}
+            items={items}
+          />
+        </nav>
+        <button
+          type="button"
+          className="forge-sider-toggle"
+          onClick={toggleCollapsed}
+          aria-label={collapsed ? '展开菜单' : '收起菜单'}
         >
-          <Space>
-            <span style={{ cursor: 'pointer', fontSize: 18 }} onClick={toggleCollapsed}>
-              {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-            </span>
-            {breadcrumbItems.length > 0 ? (
-              <Breadcrumb items={breadcrumbItems} />
-            ) : (
-              <Typography.Text type="secondary">首页</Typography.Text>
-            )}
-          </Space>
-          <Space>
+          {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+        </button>
+      </Sider>
+      <Layout className="forge-main">
+        <Header className="forge-header">
+          <h1 className="forge-header-title">{pageTitle}</h1>
+          <div className="forge-header-actions">
             <Tag color={user?.role === '管理员' ? 'gold' : 'blue'}>{user?.role}</Tag>
+            <span className="forge-header-divider" aria-hidden />
             <Dropdown
               menu={{
                 items: [
@@ -322,24 +334,26 @@ export default function MainLayout() {
                 ],
               }}
             >
-              <span style={{ cursor: 'pointer' }}>
-                <Avatar size="small" icon={<UserOutlined />} />{' '}
+              <span className="forge-header-user">
+                <Avatar size="small" icon={<UserOutlined />} />
                 <Typography.Text>{user?.username}</Typography.Text>
               </span>
             </Dropdown>
-          </Space>
+          </div>
         </Header>
-        <Content style={{ margin: 16, background: 'transparent' }}>
+        <Content className="forge-content">
           {mustChangePassword && (
             <Alert
               type="warning"
               showIcon
-              style={{ marginBottom: 12 }}
+              style={{ marginBottom: 16 }}
               message="您正在使用默认密码登录，请尽快前往「修改密码」更换。"
               action={<Link to="/profile">去修改</Link>}
             />
           )}
-          <Outlet />
+          <div className="forge-page">
+            <Outlet />
+          </div>
         </Content>
       </Layout>
     </Layout>

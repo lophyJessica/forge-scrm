@@ -32,6 +32,8 @@ import BenchmarkAccounts from '@/pages/collection/BenchmarkAccounts'
 import CollectionTasks from '@/pages/collection/CollectionTasks'
 import ResearchTasks from '@/pages/research/ResearchTasks'
 import ResearchReport from '@/pages/research/ResearchReport'
+import ReportList from '@/pages/reports/ReportList'
+import ReportDetail from '@/pages/reports/ReportDetail'
 
 export default function App() {
   return (
@@ -71,6 +73,8 @@ export default function App() {
         <Route path="/analysis/raw-data" element={<RawData />} />
         <Route path="/analysis/tasks" element={<AnalysisTasks />} />
         <Route path="/analysis/tasks/:id" element={<AnalysisTaskDetail />} />
+        <Route path="/reports" element={<ReportList />} />
+        <Route path="/reports/:id" element={<ReportDetail />} />
 
         {/* 模块 05 权限 */}
         <Route

@@ -55,6 +55,7 @@ def _register_routers() -> None:
         meta,
         prompts,
         phase2,
+        reports,
         scripts,
         topics,
         users,
@@ -71,6 +72,7 @@ def _register_routers() -> None:
         prompts,
         directions,
         phase2,
+        reports,
     ):
         app.include_router(module.router)
     app.include_router(prompts.v1_router)

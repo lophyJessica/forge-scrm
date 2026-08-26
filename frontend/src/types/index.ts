@@ -372,6 +372,71 @@ export interface RawDataImportResult {
 /** /api/meta/enums 返回的枚举字典（前端不硬编码第二套，context/05 §5）。 */
 export type EnumMap = Record<string, string[]>
 
+export type ReportType = '运营数据报告' | '市场分析周报'
+export type ReportGenerationStatus = '待生成' | '生成中' | '已完成' | '失败'
+export type ReportReviewStatus = '默认通过' | '抽查中' | '已确认' | '待审核' | '已废弃'
+export type ReportPushChannel = '飞书' | '微信'
+export type ReportPushStatus = '待推送' | '推送中' | '已推送' | '失败'
+
+export interface ReportOut {
+  id: number
+  report_no: string
+  report_type: ReportType
+  title: string
+  period_start: string
+  period_end: string
+  template_id?: number | null
+  source_config: Record<string, unknown>
+  source_snapshot?: Record<string, unknown> | null
+  summary: string
+  content: string
+  sections?: Record<string, unknown> | null
+  conclusions?: Record<string, unknown> | null
+  generation_trace?: Record<string, unknown> | null
+  raw_ai_response?: string | null
+  is_ai_product: boolean
+  generation_status: ReportGenerationStatus
+  review_status: ReportReviewStatus
+  retry_count: number
+  error_code?: string | null
+  error_message?: string | null
+  created_by: number
+  created_at: string
+  updated_at: string
+  generated_at?: string | null
+}
+
+export interface ReportPushRecordOut {
+  id: number
+  push_task_id: number
+  channel: ReportPushChannel
+  target_object: string
+  recipient_type: string
+  message_summary: string
+  sent_at?: string | null
+  status: ReportPushStatus
+  error_code?: string | null
+  error_message?: string | null
+  attempt_no: number
+  created_at: string
+}
+
+export interface ReportPushTaskOut {
+  id: number
+  task_no: string
+  report_id: number
+  channel: ReportPushChannel
+  recipient_type: string
+  target_object: string
+  message_config?: Record<string, unknown> | null
+  status: ReportPushStatus
+  retry_count: number
+  created_by: number
+  created_at: string
+  updated_at: string
+  records?: ReportPushRecordOut[]
+}
+
 export interface PermissionItem {
   code: string
   label: string
