@@ -102,12 +102,13 @@ export default function ScriptGenerate() {
           style={{ marginBottom: 16 }}
           message="一期为同步生成：点击后请等待返回。每个选题生成 2-3 版脚本，生成后选题状态自动流转为「已生成脚本」。"
         />
-        <Form
-          form={form}
-          layout="vertical"
-          style={{ width: '100%', maxWidth: 720 }}
-          initialValues={{ version_count: 3, content_elements: [], prompt_mode: 'builtin', builtin_prompt_type: '脚本生成' }}
-        >
+        <div style={{ width: '100%', maxWidth: 720 }}>
+          <Form
+            form={form}
+            layout="vertical"
+            style={{ width: '100%' }}
+            initialValues={{ version_count: 3, content_elements: [], prompt_mode: 'builtin', builtin_prompt_type: '脚本生成' }}
+          >
           <Form.Item name="topic_id" label="来源选题（仅「已选定」）" rules={[{ required: true }]}>
             <Select
               showSearch
@@ -177,7 +178,8 @@ export default function ScriptGenerate() {
           <Button type="primary" loading={loading} onClick={run}>
             开始生成
           </Button>
-        </Form>
+          </Form>
+        </div>
       </Card>
 
       <Modal open={saveTemplateOpen} title="保存为模板" onCancel={() => setSaveTemplateOpen(false)} onOk={() => void saveTemplate()}>

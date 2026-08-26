@@ -266,12 +266,13 @@ export default function TopicGenerate() {
           style={{ marginBottom: 16 }}
           message="一期为同步生成：点击后请等待返回，不做后台队列。每个方向默认生成 10 条，完全重复的标题会跨批次自动去重。"
         />
-        <Form
-          form={form}
-          layout="vertical"
-          initialValues={{ count: 10, prompt_mode: 'builtin', builtin_prompt_type: '选题生成' }}
-          style={{ width: '100%', maxWidth: 720 }}
-        >
+        <div style={{ width: '100%', maxWidth: 720 }}>
+          <Form
+            form={form}
+            layout="vertical"
+            initialValues={{ count: 10, prompt_mode: 'builtin', builtin_prompt_type: '选题生成' }}
+            style={{ width: '100%' }}
+          >
           <Form.Item name="direction" hidden rules={[{ required: true }]}>
             <Input />
           </Form.Item>
@@ -416,7 +417,8 @@ export default function TopicGenerate() {
           <Button type="primary" loading={loading} onClick={run}>
             开始生成
           </Button>
-        </Form>
+          </Form>
+        </div>
       </Card>
 
       <Modal open={saveTemplateOpen} title="保存为模板" onCancel={() => setSaveTemplateOpen(false)} onOk={() => void saveTemplate()}>
