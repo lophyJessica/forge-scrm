@@ -1,7 +1,7 @@
 /** 主框架：侧边菜单（默认折叠 + 记忆）+ 顶栏 + 路由出口。 */
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Alert, Avatar, Dropdown, Layout, Menu, Space, Tag, Typography } from 'antd'
+import { Alert, Avatar, Breadcrumb, Dropdown, Layout, Menu, Space, Tag, Typography } from 'antd'
 import {
   BarChartOutlined,
   BookOutlined,
@@ -29,12 +29,121 @@ function readCollapsed(): boolean {
   return stored === null ? true : stored === 'true'
 }
 
-interface MenuGroup {
+interface MenuRouteDefinition {
   key: string
-  children?: Array<{ key: string }>
+  label: string
 }
 
-function parentKeyForPath(path: string, menuGroups: MenuGroup[]): string | undefined {
+interface MenuGroupDefinition {
+  key: string
+  label: string
+  icon: React.ReactNode
+  parentPath: string
+  children: MenuRouteDefinition[]
+}
+
+interface BreadcrumbRouteDefinition {
+  label: string
+  groupKey?: string
+  path?: string
+  match?: RegExp
+}
+
+const NAV_GROUPS: MenuGroupDefinition[] = [
+  {
+    key: 'materials',
+    icon: <BookOutlined />,
+    label: '资料库',
+    parentPath: '/materials',
+    children: [
+      { key: '/materials', label: '资料列表' },
+      { key: '/materials/new', label: '新建资料' },
+      { key: '/materials/import', label: '批量导入' },
+      { key: '/materials/review', label: '资料审核' },
+      { key: '/material-classes', label: '分类管理' },
+      { key: '/tags', label: '标签管理' },
+    ],
+  },
+  {
+    key: 'topics',
+    icon: <BulbOutlined />,
+    label: '选题库',
+    parentPath: '/topics',
+    children: [
+      { key: '/topics', label: '选题列表' },
+      { key: '/topics/generate', label: '批量生成' },
+      { key: '/topics/batches', label: '生成批次' },
+      { key: '/topics/new', label: '手动新增' },
+    ],
+  },
+  {
+    key: 'scripts',
+    icon: <FileTextOutlined />,
+    label: '脚本库',
+    parentPath: '/scripts',
+    children: [
+      { key: '/scripts', label: '脚本列表' },
+      { key: '/scripts/generate', label: '基于选题生成' },
+      { key: '/scripts/new', label: '独立创建' },
+      { key: '/scripts/review', label: '脚本审核' },
+    ],
+  },
+  {
+    key: 'analysis',
+    icon: <BarChartOutlined />,
+    label: '数据分析',
+    parentPath: '/analysis/tasks',
+    children: [
+      { key: '/analysis/data-sources', label: '数据源管理' },
+      { key: '/analysis/raw-data', label: '原始数据' },
+      { key: '/analysis/tasks', label: '分析任务' },
+      { key: '/analysis/prompts', label: '提示词模板' },
+    ],
+  },
+]
+
+const ADMIN_GROUP: MenuGroupDefinition = {
+  key: 'admin',
+  icon: <TeamOutlined />,
+  label: '权限管理',
+  parentPath: '/admin/users',
+  children: [{ key: '/admin/users', label: '成员与权限' }],
+}
+
+const ALL_NAV_GROUPS = [...NAV_GROUPS, ADMIN_GROUP]
+
+// 详情页不在侧边菜单中，仍由当前真实路由匹配出面包屑标题。
+const DETAIL_ROUTES: BreadcrumbRouteDefinition[] = [
+  { match: /^\/materials\/[^/]+$/, label: '编辑资料', groupKey: 'materials' },
+  { match: /^\/topics\/[^/]+\/edit$/, label: '修改选题', groupKey: 'topics' },
+  { match: /^\/topics\/[^/]+$/, label: '选题详情', groupKey: 'topics' },
+  { match: /^\/scripts\/[^/]+\/versions$/, label: '版本历史', groupKey: 'scripts' },
+  { match: /^\/scripts\/[^/]+\/edit$/, label: '修改脚本', groupKey: 'scripts' },
+  { match: /^\/scripts\/[^/]+$/, label: '脚本详情', groupKey: 'scripts' },
+  { match: /^\/analysis\/tasks\/[^/]+$/, label: '分析任务详情', groupKey: 'analysis' },
+  { path: '/profile', label: '修改密码' },
+]
+
+function routeDefinitionForPath(path: string): BreadcrumbRouteDefinition | undefined {
+  for (const group of ALL_NAV_GROUPS) {
+    const route = group.children.find((child) => child.key === path)
+    if (route) return { path: route.key, label: route.label, groupKey: group.key }
+  }
+  return DETAIL_ROUTES.find((route) => route.path === path || route.match?.test(path))
+}
+
+function breadcrumbItemsForPath(path: string) {
+  if (path === '/') return []
+  const route = routeDefinitionForPath(path)
+  if (!route) return []
+  const group = route.groupKey ? ALL_NAV_GROUPS.find(({ key }) => key === route.groupKey) : undefined
+  return [
+    ...(group ? [{ title: <Link to={group.parentPath}>{group.label}</Link> }] : []),
+    { title: route.label },
+  ]
+}
+
+function parentKeyForPath(path: string, menuGroups: MenuGroupDefinition[]): string | undefined {
   if (path === '/') return undefined
   return menuGroups.find(
     ({ key, children }) =>
@@ -55,65 +164,21 @@ export default function MainLayout() {
     if (token) void loadMeta()
   }, [token, loadMeta])
 
-  const moduleItems = useMemo(() => {
-    const base = [
-      {
-        key: 'materials',
-        icon: <BookOutlined />,
-        label: '资料库',
-        children: [
-          { key: '/materials', label: <Link to="/materials">资料列表</Link> },
-          { key: '/materials/new', label: <Link to="/materials/new">新建资料</Link> },
-          { key: '/materials/import', label: <Link to="/materials/import">批量导入</Link> },
-          { key: '/materials/review', label: <Link to="/materials/review">资料审核</Link> },
-          { key: '/material-classes', label: <Link to="/material-classes">分类管理</Link> },
-          { key: '/tags', label: <Link to="/tags">标签管理</Link> },
-        ],
-      },
-      {
-        key: 'topics',
-        icon: <BulbOutlined />,
-        label: '选题库',
-        children: [
-          { key: '/topics', label: <Link to="/topics">选题列表</Link> },
-          { key: '/topics/generate', label: <Link to="/topics/generate">批量生成</Link> },
-          { key: '/topics/batches', label: <Link to="/topics/batches">生成批次</Link> },
-          { key: '/topics/new', label: <Link to="/topics/new">手动新增</Link> },
-        ],
-      },
-      {
-        key: 'scripts',
-        icon: <FileTextOutlined />,
-        label: '脚本库',
-        children: [
-          { key: '/scripts', label: <Link to="/scripts">脚本列表</Link> },
-          { key: '/scripts/generate', label: <Link to="/scripts/generate">基于选题生成</Link> },
-          { key: '/scripts/new', label: <Link to="/scripts/new">独立创建</Link> },
-          { key: '/scripts/review', label: <Link to="/scripts/review">脚本审核</Link> },
-        ],
-      },
-      {
-        key: 'analysis',
-        icon: <BarChartOutlined />,
-        label: '数据分析',
-        children: [
-          { key: '/analysis/data-sources', label: <Link to="/analysis/data-sources">数据源管理</Link> },
-          { key: '/analysis/raw-data', label: <Link to="/analysis/raw-data">原始数据</Link> },
-          { key: '/analysis/tasks', label: <Link to="/analysis/tasks">分析任务</Link> },
-          { key: '/analysis/prompts', label: <Link to="/analysis/prompts">提示词模板</Link> },
-        ],
-      },
-    ]
-    if (isAdmin()) {
-      base.push({
-        key: 'admin',
-        icon: <TeamOutlined />,
-        label: '权限管理',
-        children: [{ key: '/admin/users', label: <Link to="/admin/users">成员与权限</Link> }],
-      })
-    }
-    return base
-  }, [isAdmin])
+  const visibleGroups = useMemo(() => (isAdmin() ? ALL_NAV_GROUPS : NAV_GROUPS), [isAdmin])
+
+  const moduleItems = useMemo(
+    () =>
+      visibleGroups.map((group) => ({
+        key: group.key,
+        icon: group.icon,
+        label: group.label,
+        children: group.children.map((route) => ({
+          key: route.key,
+          label: <Link to={route.key}>{route.label}</Link>,
+        })),
+      })),
+    [visibleGroups],
+  )
 
   const items = useMemo(
     () => [
@@ -132,9 +197,9 @@ export default function MainLayout() {
       setOpenKeys([])
       return
     }
-    const parent = parentKeyForPath(location.pathname, moduleItems)
+    const parent = parentKeyForPath(location.pathname, visibleGroups)
     setOpenKeys(parent ? [parent] : [])
-  }, [collapsed, location.pathname, moduleItems])
+  }, [collapsed, location.pathname, visibleGroups])
 
   const toggleCollapsed = () => {
     const next = !collapsed
@@ -146,6 +211,7 @@ export default function MainLayout() {
   if (!token) return <Navigate to="/login" replace />
 
   const selectedKey = location.pathname === '/' ? '/' : location.pathname
+  const breadcrumbItems = breadcrumbItemsForPath(location.pathname)
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -195,9 +261,11 @@ export default function MainLayout() {
             <span style={{ cursor: 'pointer', fontSize: 18 }} onClick={toggleCollapsed}>
               {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
             </span>
-            <Typography.Text type="secondary">
-              {location.pathname === '/' ? '首页' : location.pathname}
-            </Typography.Text>
+            {breadcrumbItems.length > 0 ? (
+              <Breadcrumb items={breadcrumbItems} />
+            ) : (
+              <Typography.Text type="secondary">首页</Typography.Text>
+            )}
           </Space>
           <Space>
             <Tag color={user?.role === '管理员' ? 'gold' : 'blue'}>{user?.role}</Tag>
