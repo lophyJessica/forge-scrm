@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     deepseek_timeout: int = 120
     deepseek_max_retry: int = 3
 
+    # 研究助手检索（key 只能来自环境变量 TAVILY_API_KEY；供应商可替换）
+    tavily_api_key: str = ""
+    tavily_base_url: str = "https://api.tavily.com/search"
+    tavily_timeout: int = 30
+
     # 本地文件存储（D-T4）
     data_dir: str = "./data"
 

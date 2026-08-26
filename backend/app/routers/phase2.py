@@ -1,11 +1,8 @@
-"""二期自动采集与研究助手 CRUD 骨架。
-
-执行、重试、采集、联网检索和 AI 生成接口暂不实现，统一返回 501。
-"""
+"""二期自动采集与研究助手 CRUD 及执行入口。"""
 
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 from sqlalchemy import func, select
 
 from app.core.deps import CurrentUser, DbSession
@@ -38,12 +35,9 @@ from app.schemas.phase2 import (
     ResearchTaskOut,
     ResearchTaskUpdate,
 )
+from app.services import collection_executor, research_executor
 
 router = APIRouter(prefix="/api/v1", tags=["二期骨架"])
-
-
-def _not_implemented(action: str) -> None:
-    raise HTTPException(status_code=501, detail=f"{action}暂未实现，当前仅提供数据骨架")
 
 
 def _task_no(prefix: str) -> str:
@@ -272,18 +266,24 @@ def delete_collection_task(task_id: int, _: CurrentUser, db: DbSession) -> OkRes
     return OkResult(message="采集任务已删除")
 
 
-@router.post("/collection-tasks/{task_id}/execute", summary="触发采集任务（占位）")
-def execute_collection_task(task_id: int, _: CurrentUser, db: DbSession) -> None:
-    if not db.get(CollectionTask, task_id):
-        raise not_found("采集任务")
-    _not_implemented("采集任务执行")
+@router.post(
+    "/collection-tasks/{task_id}/execute",
+    response_model=CollectionTaskOut,
+    summary="触发采集任务",
+)
+def execute_collection_task(task_id: int, _: CurrentUser, db: DbSession) -> CollectionTaskOut:
+    task = collection_executor.execute_task(db, task_id)
+    return CollectionTaskOut.model_validate(task)
 
 
-@router.post("/collection-tasks/{task_id}/retry", summary="重试采集任务（占位）")
-def retry_collection_task(task_id: int, _: CurrentUser, db: DbSession) -> None:
-    if not db.get(CollectionTask, task_id):
-        raise not_found("采集任务")
-    _not_implemented("采集任务重试")
+@router.post(
+    "/collection-tasks/{task_id}/retry",
+    response_model=CollectionTaskOut,
+    summary="重试采集任务",
+)
+def retry_collection_task(task_id: int, _: CurrentUser, db: DbSession) -> CollectionTaskOut:
+    task = collection_executor.retry_task(db, task_id)
+    return CollectionTaskOut.model_validate(task)
 
 
 # ==================== 自动采集：记录 / 结果 ====================
@@ -465,18 +465,24 @@ def delete_research_task(task_id: int, _: CurrentUser, db: DbSession) -> OkResul
     return OkResult(message="研究任务已删除")
 
 
-@router.post("/research-tasks/{task_id}/execute", summary="执行研究任务（占位）")
-def execute_research_task(task_id: int, _: CurrentUser, db: DbSession) -> None:
-    if not db.get(ResearchTask, task_id):
-        raise not_found("研究任务")
-    _not_implemented("研究任务执行")
+@router.post(
+    "/research-tasks/{task_id}/execute",
+    response_model=ResearchTaskOut,
+    summary="执行研究任务",
+)
+def execute_research_task(task_id: int, _: CurrentUser, db: DbSession) -> ResearchTaskOut:
+    task = research_executor.execute_task(db, task_id)
+    return ResearchTaskOut.model_validate(task)
 
 
-@router.post("/research-tasks/{task_id}/retry", summary="重试研究任务（占位）")
-def retry_research_task(task_id: int, _: CurrentUser, db: DbSession) -> None:
-    if not db.get(ResearchTask, task_id):
-        raise not_found("研究任务")
-    _not_implemented("研究任务重试")
+@router.post(
+    "/research-tasks/{task_id}/retry",
+    response_model=ResearchTaskOut,
+    summary="重试研究任务",
+)
+def retry_research_task(task_id: int, _: CurrentUser, db: DbSession) -> ResearchTaskOut:
+    task = research_executor.retry_task(db, task_id)
+    return ResearchTaskOut.model_validate(task)
 
 
 # ==================== 研究助手：报告 / 引用 ====================
