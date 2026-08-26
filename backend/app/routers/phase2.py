@@ -37,7 +37,7 @@ from app.schemas.phase2 import (
 )
 from app.services import collection_executor, research_executor
 
-router = APIRouter(prefix="/api/v1", tags=["二期骨架"])
+router = APIRouter(prefix="/api", tags=["二期骨架"])
 
 
 def _task_no(prefix: str) -> str:
