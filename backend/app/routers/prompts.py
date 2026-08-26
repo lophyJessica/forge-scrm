@@ -51,15 +51,24 @@ def list_templates(
     )
 
 
-@router.get("/builtin", response_model=list[dict[str, str]], summary="内置默认提示词（只读）")
-@v1_router.get("/builtin", response_model=list[dict[str, str]], summary="内置默认提示词（只读）")
-def list_builtin_templates(_: CurrentUser) -> list[dict[str, str]]:
-    """返回代码内置提示词；不落库、不允许编辑。"""
+@router.get("/builtin", response_model=list[dict[str, str]], summary="模板库默认模板")
+@v1_router.get("/builtin", response_model=list[dict[str, str]], summary="模板库默认模板")
+def list_builtin_templates(_: CurrentUser, db: DbSession) -> list[dict[str, str]]:
+    """返回每个生成任务类型的首条模板；空表时回退代码常量。"""
 
-    return [
-        {"task_type": PromptTaskType.选题生成.value, "content": DEFAULT_TOPIC_SYSTEM_PROMPT},
-        {"task_type": PromptTaskType.脚本生成.value, "content": DEFAULT_SCRIPT_SYSTEM_PROMPT},
-    ]
+    result: list[dict[str, str]] = []
+    fallbacks = {
+        PromptTaskType.选题生成: DEFAULT_TOPIC_SYSTEM_PROMPT,
+        PromptTaskType.脚本生成: DEFAULT_SCRIPT_SYSTEM_PROMPT,
+    }
+    for task_type, fallback in fallbacks.items():
+        template = db.scalar(
+            select(PromptTemplate)
+            .where(PromptTemplate.task_type == task_type)
+            .order_by(PromptTemplate.id.asc())
+        )
+        result.append({"task_type": task_type.value, "content": template.content if template else fallback})
+    return result
 
 
 @router.post("", response_model=PromptTemplateOut, summary="新建提示词模板")
@@ -124,6 +133,13 @@ def delete_template(
     template = db.get(PromptTemplate, template_id)
     if not template:
         raise not_found("提示词模板")
+    remaining = db.scalar(
+        select(func.count())
+        .select_from(PromptTemplate)
+        .where(PromptTemplate.task_type == template.task_type)
+    ) or 0
+    if remaining <= 1:
+        raise BizError("该任务类型至少需要保留一条模板")
     db.delete(template)
     db.commit()
     return OkResult(message="提示词模板已删除")

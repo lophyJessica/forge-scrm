@@ -8,11 +8,13 @@ import {
   Form,
   Input,
   InputNumber,
+  Modal,
   Radio,
   Select,
   Space,
   Statistic,
   Table,
+  Tooltip,
   message,
 } from 'antd'
 import { http } from '@/api/client'
@@ -62,6 +64,8 @@ export default function TopicGenerate() {
   const [materials, setMaterials] = useState<MaterialOut[]>([])
   const [builtinPrompts, setBuiltinPrompts] = useState<BuiltinPrompt[]>([])
   const [loading, setLoading] = useState(false)
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false)
+  const [saveTemplateName, setSaveTemplateName] = useState('自定义选题提示词')
   const [result, setResult] = useState<TopicGenerateResult | null>(null)
   const [businessDirections, setBusinessDirections] = useState<BusinessDirection[]>(STATIC_BUSINESS_DIRECTIONS)
   const [specialties, setSpecialties] = useState<SpecialtyItem[]>(STATIC_SPECIALTIES)
@@ -229,6 +233,29 @@ export default function TopicGenerate() {
   }
 
   const promptMode = Form.useWatch('prompt_mode', form) || 'builtin'
+  const promptContent = Form.useWatch('prompt_content', form) || ''
+  const builtinPromptType = Form.useWatch('builtin_prompt_type', form)
+  const selectedBuiltin = builtinPrompts.find((prompt) => prompt.task_type === builtinPromptType)
+
+  const openSaveTemplate = () => {
+    if (!promptContent.trim()) {
+      message.warning('请先输入自定义提示词')
+      return
+    }
+    setSaveTemplateName('自定义选题提示词')
+    setSaveTemplateOpen(true)
+  }
+
+  const saveTemplate = async () => {
+    const name = saveTemplateName.trim()
+    if (!name) {
+      message.warning('请输入模板名称')
+      return
+    }
+    await http.post('/prompt-templates', { task_type: '选题生成', name, content: promptContent.trim() })
+    message.success('已保存到模板库')
+    setSaveTemplateOpen(false)
+  }
 
   return (
     <Space direction="vertical" style={{ width: '100%' }} size={16}>
@@ -344,34 +371,49 @@ export default function TopicGenerate() {
             />
           </Form.Item>
           <Form.Item name="prompt_mode" label="提示词使用方式">
-            <Radio.Group options={[{ label: '内置模板', value: 'builtin' }, { label: '自定义', value: 'custom' }]} />
+            <Radio.Group options={[{ label: '模板库', value: 'builtin' }, { label: '自定义', value: 'custom' }]} />
           </Form.Item>
           {promptMode === 'builtin' ? (
-            <Form.Item name="builtin_prompt_type" label="内置提示词">
-              <Select
-                loading={!builtinPrompts.length}
-                placeholder="选择内置模板（默认即可）"
-                options={builtinPrompts.map((prompt) => ({
-                  value: prompt.task_type,
-                  label: `${prompt.task_type}：${prompt.content.replace(/\s+/g, ' ').slice(0, 30)}`,
-                }))}
-              />
+            <Form.Item name="builtin_prompt_type" label="模板库">
+              <Tooltip title={selectedBuiltin?.content} placement="topLeft">
+                <Select
+                  loading={!builtinPrompts.length}
+                  placeholder="选择模板（默认即可）"
+                  optionLabelProp="shortLabel"
+                  options={builtinPrompts.map((prompt) => ({
+                    value: prompt.task_type,
+                    label: `${prompt.task_type}：${prompt.content}`,
+                    shortLabel: prompt.task_type,
+                  }))}
+                  optionRender={(option) => (
+                    <div style={{ whiteSpace: 'normal', lineHeight: 1.5 }}>{option.data.label}</div>
+                  )}
+                />
+              </Tooltip>
             </Form.Item>
           ) : (
-            <Form.Item
-              name="prompt_content"
-              label="自定义提示词"
-              preserve={false}
-              rules={[{ required: true, whitespace: true, message: '请输入自定义提示词' }]}
-            >
-              <Input.TextArea rows={6} placeholder="输入自定义提示词，将替代内置模板和已配置模板生效" showCount />
-            </Form.Item>
+            <>
+              <Form.Item name="prompt_content" label="自定义提示词" rules={[{ required: true, whitespace: true, message: '请输入自定义提示词' }]}>
+                <Input.TextArea rows={6} placeholder="输入自定义提示词，将替代模板库内容生效" showCount />
+              </Form.Item>
+              <Form.Item>
+                <Button disabled={!promptContent.trim()} onClick={openSaveTemplate}>保存为模板</Button>
+              </Form.Item>
+            </>
           )}
           <Button type="primary" loading={loading} onClick={run}>
             开始生成
           </Button>
         </Form>
       </Card>
+
+      <Modal open={saveTemplateOpen} title="保存为模板" onCancel={() => setSaveTemplateOpen(false)} onOk={() => void saveTemplate()}>
+        <Form layout="vertical">
+          <Form.Item label="模板名称" required>
+            <Input value={saveTemplateName} maxLength={100} onChange={(event) => setSaveTemplateName(event.target.value)} />
+          </Form.Item>
+        </Form>
+      </Modal>
 
       {result && (
         <Card

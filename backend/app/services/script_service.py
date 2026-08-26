@@ -6,7 +6,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.enums import MaterialStatus, ScriptStyle
+from app.core.enums import MaterialStatus, PromptTaskType, ScriptStyle
 from app.core.exceptions import BizError
 from app.models.material import Material
 from app.models.prompt import PromptTemplate
@@ -92,14 +92,6 @@ def build_prompt(
             f"- {r.title}：{r.content[:500]}" for r in rows
         )
 
-    system_prompt = DEFAULT_SYSTEM_PROMPT
-    # 未选模板时也留快照（内置模板），保证 S04 追溯完整
-    snapshot: dict | None = {
-        "template_id": None,
-        "name": "内置脚本生成提示词",
-        "version": 0,
-        "content_snapshot": DEFAULT_SYSTEM_PROMPT,
-    }
     custom_prompt = (prompt_content or "").strip()
     if custom_prompt:
         system_prompt = custom_prompt
@@ -107,17 +99,28 @@ def build_prompt(
             "prompt_type": "custom",
             "content": custom_prompt,
         }
-    elif template_id is not None:
-        template = db.get(PromptTemplate, template_id)
-        if template is None:
-            raise BizError("提示词模板不存在")
-        system_prompt = template.content
-        snapshot = {
-            "template_id": template.id,
-            "name": template.name,
-            "version": template.version,
-            "content_snapshot": template.content,
-        }
+    else:
+        template = db.get(PromptTemplate, template_id) if template_id is not None else db.scalar(
+            select(PromptTemplate)
+            .where(PromptTemplate.task_type == PromptTaskType.脚本生成)
+            .order_by(PromptTemplate.id.asc())
+        )
+        if template is not None:
+            system_prompt = template.content
+            snapshot = {
+                "template_id": template.id,
+                "name": template.name,
+                "version": template.version,
+                "content_snapshot": template.content,
+            }
+        else:
+            system_prompt = DEFAULT_SYSTEM_PROMPT
+            snapshot = {
+                "template_id": None,
+                "name": "内置脚本生成提示词",
+                "version": 0,
+                "content_snapshot": DEFAULT_SYSTEM_PROMPT,
+            }
 
     user_prompt = DEFAULT_USER_PROMPT_TEMPLATE.format(
         count=count,

@@ -1,21 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Alert, Button, Card, Col, Form, Input, Modal, Popconfirm, Row, Select, Space, Table, Tag, Typography, message } from 'antd'
+import { Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, Typography, message } from 'antd'
 import { http } from '@/api/client'
 import { PERM } from '@/store/meta'
 import { useAuthStore } from '@/store/auth'
 import type { PageResult, PromptTemplateOut } from '@/types'
 
-interface BuiltinPrompt {
-  task_type: '选题生成' | '脚本生成'
-  content: string
-}
-
 const TASK_TYPE_OPTIONS = [
   { label: '选题生成', value: '选题生成' },
   { label: '脚本生成', value: '脚本生成' },
 ]
-
-const BUILTIN_ORDER: BuiltinPrompt['task_type'][] = ['选题生成', '脚本生成']
 
 function formatTime(value: string | undefined) {
   return value ? value.replace('T', ' ').slice(0, 19) : '—'
@@ -29,7 +22,6 @@ export default function PromptTemplates() {
   const [form] = Form.useForm()
   const can = useAuthStore((state) => state.can)
   const [rows, setRows] = useState<PromptTemplateOut[]>([])
-  const [builtins, setBuiltins] = useState<BuiltinPrompt[]>([])
   const [loading, setLoading] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<PromptTemplateOut | null>(null)
@@ -37,12 +29,8 @@ export default function PromptTemplates() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [templatesResponse, builtinResponse] = await Promise.all([
-        http.get<PageResult<PromptTemplateOut>>('/prompt-templates', { params: { page_size: 200 } }),
-        http.get<BuiltinPrompt[]>('/prompt-templates/builtin'),
-      ])
+      const templatesResponse = await http.get<PageResult<PromptTemplateOut>>('/prompt-templates', { params: { page_size: 200 } })
       setRows(templatesResponse.data.items)
-      setBuiltins(builtinResponse.data)
     } finally {
       setLoading(false)
     }
@@ -85,30 +73,6 @@ export default function PromptTemplates() {
 
   return (
     <Space direction="vertical" size={16} style={{ display: 'flex' }}>
-      <Card title="内置默认提示词">
-        <Alert
-          type="info"
-          showIcon
-          message="内置默认，仅展示不可编辑"
-          description="生成页不选择数据库模板时使用对应的内置提示词。内置内容来自后端代码常量，不会写入模板表。"
-          style={{ marginBottom: 16 }}
-        />
-        <Row gutter={[16, 16]}>
-          {BUILTIN_ORDER.map((taskType) => {
-            const builtin = builtins.find((item) => item.task_type === taskType)
-            return (
-              <Col xs={24} lg={12} key={taskType}>
-                <Card size="small" title={taskType} extra={<Tag color="blue">只读</Tag>}>
-                  <Typography.Paragraph ellipsis={{ rows: 3, tooltip: builtin?.content }} style={{ marginBottom: 0 }}>
-                    {builtin?.content || '加载中...'}
-                  </Typography.Paragraph>
-                </Card>
-              </Col>
-            )
-          })}
-        </Row>
-      </Card>
-
       <Card
         title="提示词模板"
         extra={can(PERM.提示词配置) ? <Button type="primary" onClick={() => openModal()}>新建模板</Button> : null}
@@ -137,7 +101,7 @@ export default function PromptTemplates() {
               render: (_, row) => (
                 <Space size={4}>
                   {can(PERM.提示词配置) && <Button size="small" onClick={() => openModal(row)}>编辑</Button>}
-                  <Popconfirm title="确认删除该模板？" description="删除后不可恢复。" onConfirm={() => remove(row.id)}>
+                  <Popconfirm title="确认删除该模板？" description="删除后不可恢复；如果这是该任务类型的最后一条模板，后端会拒绝删除。" onConfirm={() => remove(row.id)}>
                     <Button size="small" danger>删除</Button>
                   </Popconfirm>
                 </Space>
