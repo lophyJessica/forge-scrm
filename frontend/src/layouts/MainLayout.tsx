@@ -14,6 +14,8 @@ import {
   SettingOutlined,
   TeamOutlined,
   UserOutlined,
+  RadarChartOutlined,
+  RobotOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '@/store/auth'
 import { useMetaStore } from '@/store/meta'
@@ -113,7 +115,27 @@ const ADMIN_GROUP: MenuGroupDefinition = {
   ],
 }
 
-const ALL_NAV_GROUPS = [...NAV_GROUPS, ADMIN_GROUP]
+const PHASE2_GROUPS: MenuGroupDefinition[] = [
+  {
+    key: 'collection',
+    icon: <RadarChartOutlined />,
+    label: '内容管理',
+    parentPath: '/collection/tasks',
+    children: [
+      { key: '/collection/benchmark-accounts', label: '对标账号' },
+      { key: '/collection/tasks', label: '自动采集' },
+    ],
+  },
+  {
+    key: 'research',
+    icon: <RobotOutlined />,
+    label: 'AI 模块',
+    parentPath: '/research/tasks',
+    children: [{ key: '/research/tasks', label: '研究助手' }],
+  },
+]
+
+const ALL_NAV_GROUPS = [...NAV_GROUPS, ...PHASE2_GROUPS, ADMIN_GROUP]
 
 // 详情页不在侧边菜单中，仍由当前真实路由匹配出面包屑标题。
 const DETAIL_ROUTES: BreadcrumbRouteDefinition[] = [
@@ -124,6 +146,7 @@ const DETAIL_ROUTES: BreadcrumbRouteDefinition[] = [
   { match: /^\/scripts\/[^/]+\/edit$/, label: '修改脚本', groupKey: 'scripts' },
   { match: /^\/scripts\/[^/]+$/, label: '脚本详情', groupKey: 'scripts' },
   { match: /^\/analysis\/tasks\/[^/]+$/, label: '分析任务详情', groupKey: 'analysis' },
+  { match: /^\/research\/reports\/[^/]+$/, label: '研究报告', groupKey: 'research' },
   { path: '/profile', label: '修改密码' },
 ]
 

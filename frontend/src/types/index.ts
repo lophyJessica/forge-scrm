@@ -214,6 +214,144 @@ export interface PromptTemplateOut {
   created_at: string
 }
 
+export interface BenchmarkAccountOut {
+  id: number
+  platform: string
+  account_identifier: string
+  account_name?: string | null
+  profile_url?: string | null
+  benchmark_flag: boolean
+  enabled: boolean
+  notes?: string | null
+  created_by: number
+  created_at: string
+  updated_at: string
+  last_collected_at?: string | null
+}
+
+export type CollectionTaskStatus = 'pending' | 'running' | 'success' | 'partial_success' | 'failed'
+
+export interface CollectionTaskOut {
+  id: number
+  task_no: string
+  trigger_type: string
+  status: CollectionTaskStatus
+  scope_type: string
+  scope_config: Record<string, unknown>
+  time_window_start: string
+  time_window_end: string
+  requested_by: number
+  started_at?: string | null
+  finished_at?: string | null
+  total_count: number
+  success_count: number
+  failure_count: number
+  retry_count: number
+  error_message?: string | null
+  idempotency_key?: string | null
+  created_at: string
+}
+
+export interface CollectionRecordOut {
+  id: number
+  task_id: number
+  benchmark_account_id?: number | null
+  source_type: string
+  source_url?: string | null
+  status: string
+  attempt_no: number
+  requested_at: string
+  completed_at?: string | null
+  raw_response?: string | null
+  http_status?: number | null
+  item_count: number
+  error_code?: string | null
+  error_message?: string | null
+  retryable: boolean
+}
+
+export interface CollectionResultOut {
+  id: number
+  record_id: number
+  task_id: number
+  benchmark_account_id?: number | null
+  business_object: string
+  platform?: string | null
+  account_identifier?: string | null
+  is_benchmark: boolean
+  source_url?: string | null
+  raw_content: string
+  structured_data?: Record<string, unknown> | null
+  collected_at: string
+  window_start: string
+  window_end: string
+  data_cleaning_note?: string | null
+  is_ai_product: boolean
+  ai_derivative_id?: number | null
+  created_at: string
+}
+
+export type ResearchTaskStatus = 'pending' | 'searching' | 'organizing' | 'success' | 'failed'
+
+export interface ResearchTaskOut {
+  id: number
+  task_no: string
+  topic: string
+  objective: string
+  scope_config: Record<string, unknown>
+  time_window_start?: string | null
+  time_window_end?: string | null
+  status: ResearchTaskStatus
+  current_stage?: string | null
+  progress_percent?: number | null
+  progress_message?: string | null
+  checkpoint_data?: Record<string, unknown> | null
+  retry_count: number
+  last_error_code?: string | null
+  last_error_message?: string | null
+  started_at?: string | null
+  finished_at?: string | null
+  requested_by: number
+  created_at: string
+  updated_at: string
+}
+
+export interface ResearchReferenceOut {
+  id: number
+  report_id: number
+  source_kind: string
+  source_url?: string | null
+  source_title?: string | null
+  search_provider?: string | null
+  collection_result_id?: number | null
+  material_id?: number | null
+  source_snapshot?: string | null
+  page_number?: string | null
+  paragraph_locator?: string | null
+  evidence_summary?: string | null
+  source_type?: string | null
+  cited_at: string
+  created_at: string
+}
+
+export interface ResearchReportOut {
+  id: number
+  research_task_id: number
+  title: string
+  summary: string
+  content: string
+  sections?: Record<string, unknown> | null
+  conclusions?: Record<string, unknown> | null
+  generation_trace?: Record<string, unknown> | null
+  raw_ai_response?: string | null
+  is_ai_product: boolean
+  status: string
+  source_count: number
+  created_at: string
+  updated_at: string
+  references?: ResearchReferenceOut[]
+}
+
 export interface ImportResult {
   total_rows: number
   success: number

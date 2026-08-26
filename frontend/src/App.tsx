@@ -29,6 +29,10 @@ import AnalysisTaskDetail from '@/pages/analysis/AnalysisTaskDetail'
 import PromptTemplates from '@/pages/analysis/PromptTemplates'
 import Users from '@/pages/admin/Users'
 import AdminPromptTemplates from '@/pages/admin/PromptTemplates'
+import BenchmarkAccounts from '@/pages/collection/BenchmarkAccounts'
+import CollectionTasks from '@/pages/collection/CollectionTasks'
+import ResearchTasks from '@/pages/research/ResearchTasks'
+import ResearchReport from '@/pages/research/ResearchReport'
 
 export default function App() {
   return (
@@ -88,6 +92,14 @@ export default function App() {
           }
         />
         <Route path="/profile" element={<Profile />} />
+
+        {/* 模块 06 自动采集 */}
+        <Route path="/collection/benchmark-accounts" element={<BenchmarkAccounts />} />
+        <Route path="/collection/tasks" element={<CollectionTasks />} />
+
+        {/* 模块 07 研究助手 */}
+        <Route path="/research/tasks" element={<ResearchTasks />} />
+        <Route path="/research/reports/:id" element={<ResearchReport />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
