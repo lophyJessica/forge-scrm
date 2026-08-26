@@ -64,7 +64,7 @@ def list_builtin_templates(_: CurrentUser, db: DbSession) -> list[dict[str, str]
     for task_type, fallback in fallbacks.items():
         template = db.scalar(
             select(PromptTemplate)
-            .where(PromptTemplate.task_type == task_type)
+            .where(PromptTemplate.task_type == task_type, PromptTemplate.status == PromptStatus.启用)
             .order_by(PromptTemplate.id.asc())
         )
         result.append({"task_type": task_type.value, "content": template.content if template else fallback})

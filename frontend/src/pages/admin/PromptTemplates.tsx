@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, Typography, message } from 'antd'
+import { Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tag, Typography, message } from 'antd'
 import { http } from '@/api/client'
 import { PERM } from '@/store/meta'
 import { useAuthStore } from '@/store/auth'
@@ -71,6 +71,12 @@ export default function PromptTemplates() {
     void load()
   }
 
+  const toggleStatus = async (row: PromptTemplateOut, enabled: boolean) => {
+    await http.put(`/prompt-templates/${row.id}`, { status: enabled ? '启用' : '停用' })
+    message.success(enabled ? '模板已启用' : '模板已停用')
+    void load()
+  }
+
   return (
     <Space direction="vertical" size={16} style={{ display: 'flex' }}>
       <Card
@@ -93,14 +99,31 @@ export default function PromptTemplates() {
               render: (value: string) => <Typography.Text ellipsis={{ tooltip: value }}>{truncate(value)}</Typography.Text>,
             },
             { title: '描述', width: 150, render: () => <Typography.Text type="secondary">—</Typography.Text> },
+            {
+              title: '状态',
+              dataIndex: 'status',
+              width: 90,
+              render: (value: string | null | undefined) => (
+                <Tag color={value === '启用' ? 'green' : 'red'}>{value || '停用'}</Tag>
+              ),
+            },
             { title: '创建时间', dataIndex: 'created_at', width: 180, render: (value: string) => formatTime(value) },
             {
               title: '操作',
-              width: 150,
+              width: 210,
               fixed: 'right',
               render: (_, row) => (
                 <Space size={4}>
                   {can(PERM.提示词配置) && <Button size="small" onClick={() => openModal(row)}>编辑</Button>}
+                  {can(PERM.提示词配置) && (
+                    <Switch
+                      size="small"
+                      checked={row.status === '启用'}
+                      checkedChildren="启用"
+                      unCheckedChildren="停用"
+                      onChange={(checked) => void toggleStatus(row, checked)}
+                    />
+                  )}
                   <Popconfirm title="确认删除该模板？" description="删除后不可恢复；如果这是该任务类型的最后一条模板，后端会拒绝删除。" onConfirm={() => remove(row.id)}>
                     <Button size="small" danger>删除</Button>
                   </Popconfirm>

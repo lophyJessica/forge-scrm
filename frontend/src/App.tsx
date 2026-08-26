@@ -26,7 +26,6 @@ import DataSources from '@/pages/analysis/DataSources'
 import RawData from '@/pages/analysis/RawData'
 import AnalysisTasks from '@/pages/analysis/AnalysisTasks'
 import AnalysisTaskDetail from '@/pages/analysis/AnalysisTaskDetail'
-import PromptTemplates from '@/pages/analysis/PromptTemplates'
 import Users from '@/pages/admin/Users'
 import AdminPromptTemplates from '@/pages/admin/PromptTemplates'
 import BenchmarkAccounts from '@/pages/collection/BenchmarkAccounts'
@@ -72,7 +71,6 @@ export default function App() {
         <Route path="/analysis/raw-data" element={<RawData />} />
         <Route path="/analysis/tasks" element={<AnalysisTasks />} />
         <Route path="/analysis/tasks/:id" element={<AnalysisTaskDetail />} />
-        <Route path="/analysis/prompts" element={<PromptTemplates />} />
 
         {/* 模块 05 权限 */}
         <Route

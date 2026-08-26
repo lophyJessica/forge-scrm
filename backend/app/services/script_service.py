@@ -6,7 +6,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.enums import MaterialStatus, PromptTaskType, ScriptStyle
+from app.core.enums import MaterialStatus, PromptStatus, PromptTaskType, ScriptStyle
 from app.core.exceptions import BizError
 from app.models.material import Material
 from app.models.prompt import PromptTemplate
@@ -102,7 +102,7 @@ def build_prompt(
     else:
         template = db.get(PromptTemplate, template_id) if template_id is not None else db.scalar(
             select(PromptTemplate)
-            .where(PromptTemplate.task_type == PromptTaskType.脚本生成)
+            .where(PromptTemplate.task_type == PromptTaskType.脚本生成, PromptTemplate.status == PromptStatus.启用)
             .order_by(PromptTemplate.id.asc())
         )
         if template is not None:

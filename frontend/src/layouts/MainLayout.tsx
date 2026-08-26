@@ -16,6 +16,7 @@ import {
   UserOutlined,
   RadarChartOutlined,
   RobotOutlined,
+  SlidersOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '@/store/auth'
 import { useMetaStore } from '@/store/meta'
@@ -99,7 +100,6 @@ const NAV_GROUPS: MenuGroupDefinition[] = [
       { key: '/analysis/data-sources', label: '数据源管理' },
       { key: '/analysis/raw-data', label: '原始数据' },
       { key: '/analysis/tasks', label: '分析任务' },
-      { key: '/analysis/prompts', label: '提示词模板' },
     ],
   },
 ]
@@ -111,7 +111,6 @@ const ADMIN_GROUP: MenuGroupDefinition = {
   parentPath: '/admin/users',
   children: [
     { key: '/admin/users', label: '成员与权限' },
-    { key: '/admin/prompt-templates', label: '提示词模板' },
   ],
 }
 
@@ -125,6 +124,13 @@ const PHASE2_GROUPS: MenuGroupDefinition[] = [
       { key: '/collection/benchmark-accounts', label: '对标账号' },
       { key: '/collection/tasks', label: '自动采集' },
     ],
+  },
+  {
+    key: 'templates',
+    icon: <SlidersOutlined />,
+    label: '模板管理',
+    parentPath: '/admin/prompt-templates',
+    children: [{ key: '/admin/prompt-templates', label: '提示词模板' }],
   },
   {
     key: 'research',
