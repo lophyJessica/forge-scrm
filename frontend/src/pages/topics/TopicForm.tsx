@@ -42,8 +42,9 @@ export default function TopicForm() {
   }
 
   return (
-    <Card title={isEdit ? '修改选题' : '手动新增选题'}>
-      <Form form={form} layout="vertical" style={{ maxWidth: 800 }} initialValues={{ material_ids: [] }}>
+    <Card title={isEdit ? '修改选题' : '手动新增选题'} style={{ width: '100%' }}>
+      <div style={{ width: '100%', maxWidth: 800 }}>
+        <Form form={form} layout="vertical" style={{ width: '100%' }} initialValues={{ material_ids: [] }}>
         <Form.Item name="title" label="选题标题" rules={[{ required: true }]}>
           <Input maxLength={200} showCount />
         </Form.Item>
@@ -84,7 +85,8 @@ export default function TopicForm() {
           </Button>
           <Button onClick={() => navigate(-1)}>取消</Button>
         </Space>
-      </Form>
+        </Form>
+      </div>
     </Card>
   )
 }

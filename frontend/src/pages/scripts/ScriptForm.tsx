@@ -50,7 +50,7 @@ export default function ScriptForm() {
   }
 
   return (
-    <Card title={isEdit ? '修改脚本' : '独立创建脚本'}>
+    <Card title={isEdit ? '修改脚本' : '独立创建脚本'} style={{ width: '100%' }}>
       <Alert
         type="info"
         showIcon
@@ -61,7 +61,8 @@ export default function ScriptForm() {
             : '独立创建时可不选来源选题（topic_id 允许为空），后续可在此页面补录关联。'
         }
       />
-      <Form form={form} layout="vertical" style={{ maxWidth: 860 }} initialValues={{ content_elements: [] }}>
+      <div style={{ width: '100%', maxWidth: 860 }}>
+        <Form form={form} layout="vertical" style={{ width: '100%' }} initialValues={{ content_elements: [] }}>
         <Form.Item name="topic_id" label="来源选题（可选，可后补）">
           <Select
             allowClear
@@ -101,7 +102,8 @@ export default function ScriptForm() {
           </Button>
           <Button onClick={() => navigate(-1)}>取消</Button>
         </Space>
-      </Form>
+        </Form>
+      </div>
     </Card>
   )
 }
