@@ -27,7 +27,7 @@ export default function MaterialForm() {
     }
   }, [id, isEdit, form])
 
-  const submit = async (submitForReview: boolean) => {
+  const submit = async () => {
     const values = await form.validateFields()
     const payload = {
       title: values.title,
@@ -42,9 +42,8 @@ export default function MaterialForm() {
     try {
       if (isEdit) {
         await http.put(`/materials/${id}`, payload)
-        if (submitForReview) await http.post(`/materials/${id}/submit`)
       } else {
-        await http.post('/materials', { ...payload, submit_for_review: submitForReview })
+        await http.post('/materials', payload)
       }
       message.success('保存成功')
       navigate('/materials')
@@ -85,11 +84,8 @@ export default function MaterialForm() {
           />
         </Form.Item>
         <Space>
-          <Button loading={saving} onClick={() => submit(false)}>
-            存为草稿
-          </Button>
-          <Button type="primary" loading={saving} onClick={() => submit(true)}>
-            保存并提交审核
+          <Button type="primary" loading={saving} onClick={() => submit()}>
+            保存
           </Button>
           <Button onClick={() => navigate('/materials')}>返回</Button>
         </Space>

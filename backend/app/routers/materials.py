@@ -338,7 +338,7 @@ def list_materials(
     )
 
 
-@router.post("/materials", response_model=MaterialOut, summary="新增资料（草稿 / 直接提交审核）")
+@router.post("/materials", response_model=MaterialOut, summary="新增资料（人工创建直接生效）")
 def create_material(
     payload: MaterialCreate, current_user: CurrentUser, db: DbSession
 ) -> MaterialOut:
@@ -356,7 +356,7 @@ def create_material(
 
     material = Material(
         **payload.model_dump(exclude={"tags", "submit_for_review"}),
-        status=MaterialStatus.待审核 if payload.submit_for_review else MaterialStatus.草稿,
+        status=MaterialStatus.已生效,
         is_ai_product=False,
         created_by=current_user.id,
     )
