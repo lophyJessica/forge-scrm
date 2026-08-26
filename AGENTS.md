@@ -97,6 +97,8 @@ curl --noproxy '*' -X POST "https://pmlophy.com/p/jarvis/file/upload" -H "X-Jarv
 
 > 注：URL 里的 /p/jarvis/ 是历史命名，与罗宾助手无关，是 AI 自检报告管道。
 
+**Codex 沙箱网络受限时的兜底（2026-08-26 定）**：Codex 沙箱内 curl 联网受审批控制，审批服务 503 或 `Could not resolve host` 时**不要反复重试**。此时只需：① 把报告文件保存到 `check-reports/`（含在 git 提交里）；② 如实汇报"沙箱网络受限，未上传管道"；③ 由杰西卡在 VPS 侧从仓库读取并上传管道。禁止声称已上传。
+
 ## 红线禁止（违反 = 返工）
 
 - ❌ 不 pull 就改文件
