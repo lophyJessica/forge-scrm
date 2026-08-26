@@ -8,6 +8,7 @@ import {
   Form,
   Input,
   InputNumber,
+  Radio,
   Select,
   Space,
   Statistic,
@@ -16,7 +17,7 @@ import {
 } from 'antd'
 import { http } from '@/api/client'
 import { useMetaStore } from '@/store/meta'
-import type { MaterialOut, PageResult, PromptTemplateOut, TopicGenerateResult } from '@/types'
+import type { MaterialOut, PageResult, TopicGenerateResult } from '@/types'
 
 interface BusinessDirection {
   id: number
@@ -28,6 +29,11 @@ interface SpecialtyItem {
   business_direction_id: number
   name: string
   enumValue: string
+}
+
+interface BuiltinPrompt {
+  task_type: '选题生成' | '脚本生成'
+  content: string
 }
 
 /** 静态兜底：后端方向表接口未就绪时使用（待后端接口替换） */
@@ -54,7 +60,7 @@ export default function TopicGenerate() {
   const options = useMetaStore((s) => s.options)
   const specialtyEnums = options('specialty')
   const [materials, setMaterials] = useState<MaterialOut[]>([])
-  const [templates, setTemplates] = useState<PromptTemplateOut[]>([])
+  const [builtinPrompts, setBuiltinPrompts] = useState<BuiltinPrompt[]>([])
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<TopicGenerateResult | null>(null)
   const [businessDirections, setBusinessDirections] = useState<BusinessDirection[]>(STATIC_BUSINESS_DIRECTIONS)
@@ -71,10 +77,12 @@ export default function TopicGenerate() {
       .get<PageResult<MaterialOut>>('/materials', { params: { status: '已生效', page_size: 200 } })
       .then((r) => setMaterials(r.data.items))
     void http
-      .get<PageResult<PromptTemplateOut>>('/prompt-templates', {
-        params: { task_type: '选题生成', page_size: 100 },
+      .get<BuiltinPrompt[]>('/prompt-templates/builtin')
+      .then((r) => {
+        const prompts = r.data.filter((item) => item.task_type === '选题生成')
+        setBuiltinPrompts(prompts)
+        if (prompts[0]) form.setFieldValue('builtin_prompt_type', prompts[0].task_type)
       })
-      .then((r) => setTemplates(r.data.items))
 
     void (async () => {
       try {
@@ -105,7 +113,7 @@ export default function TopicGenerate() {
         setDirectionsFromApi(false)
       }
     })()
-  }, [])
+  }, [form])
 
   const specialtyOptions = useMemo(() => {
     if (!selectedBusinessId) return []
@@ -203,15 +211,24 @@ export default function TopicGenerate() {
 
   const run = async () => {
     const values = await form.validateFields()
+    const payload = {
+      direction: values.direction,
+      specialty: values.specialty,
+      material_ids: values.material_ids || [],
+      count: values.count,
+      ...(values.prompt_mode === 'custom' ? { prompt_content: values.prompt_content } : {}),
+    }
     setLoading(true)
     try {
-      const { data } = await http.post<TopicGenerateResult>('/topics/generate', values)
+      const { data } = await http.post<TopicGenerateResult>('/topics/generate', payload)
       setResult(data)
       message.success(`批次 ${data.batch_no}：入库 ${data.saved} 条，去重 ${data.deduped} 条`)
     } finally {
       setLoading(false)
     }
   }
+
+  const promptMode = Form.useWatch('prompt_mode', form) || 'builtin'
 
   return (
     <Space direction="vertical" style={{ width: '100%' }} size={16}>
@@ -222,7 +239,12 @@ export default function TopicGenerate() {
           style={{ marginBottom: 16 }}
           message="一期为同步生成：点击后请等待返回，不做后台队列。每个方向默认生成 10 条，完全重复的标题会跨批次自动去重。"
         />
-        <Form form={form} layout="vertical" initialValues={{ count: 10 }} style={{ maxWidth: 720 }}>
+        <Form
+          form={form}
+          layout="vertical"
+          initialValues={{ count: 10, prompt_mode: 'builtin', builtin_prompt_type: '选题生成' }}
+          style={{ maxWidth: 720 }}
+        >
           <Form.Item name="direction" hidden rules={[{ required: true }]}>
             <Input />
           </Form.Item>
@@ -321,12 +343,30 @@ export default function TopicGenerate() {
               options={materials.map((m) => ({ label: `#${m.id} ${m.title}`, value: m.id }))}
             />
           </Form.Item>
-          <Form.Item name="prompt_template_id" label="提示词模板（可选，不选用内置模板）">
-            <Select
-              allowClear
-              options={templates.map((t) => ({ label: `${t.name} v${t.version}`, value: t.id }))}
-            />
+          <Form.Item name="prompt_mode" label="提示词使用方式">
+            <Radio.Group options={[{ label: '内置模板', value: 'builtin' }, { label: '自定义', value: 'custom' }]} />
           </Form.Item>
+          {promptMode === 'builtin' ? (
+            <Form.Item name="builtin_prompt_type" label="内置提示词">
+              <Select
+                loading={!builtinPrompts.length}
+                placeholder="选择内置模板（默认即可）"
+                options={builtinPrompts.map((prompt) => ({
+                  value: prompt.task_type,
+                  label: `${prompt.task_type}：${prompt.content.replace(/\s+/g, ' ').slice(0, 30)}`,
+                }))}
+              />
+            </Form.Item>
+          ) : (
+            <Form.Item
+              name="prompt_content"
+              label="自定义提示词"
+              preserve={false}
+              rules={[{ required: true, whitespace: true, message: '请输入自定义提示词' }]}
+            >
+              <Input.TextArea rows={6} placeholder="输入自定义提示词，将替代内置模板和已配置模板生效" showCount />
+            </Form.Item>
+          )}
           <Button type="primary" loading={loading} onClick={run}>
             开始生成
           </Button>

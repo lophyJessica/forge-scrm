@@ -128,6 +128,7 @@ def build_prompt(
     count: int,
     material_ids: list[int],
     template_id: int | None,
+    prompt_content: str | None = None,
 ) -> tuple[str, str, dict | None, list[Material]]:
     material_block, materials = build_material_block(db, material_ids)
     system_prompt = DEFAULT_SYSTEM_PROMPT
@@ -139,7 +140,14 @@ def build_prompt(
         "content_snapshot": DEFAULT_SYSTEM_PROMPT,
     }
 
-    if template_id is not None:
+    custom_prompt = (prompt_content or "").strip()
+    if custom_prompt:
+        system_prompt = custom_prompt
+        snapshot = {
+            "prompt_type": "custom",
+            "content": custom_prompt,
+        }
+    elif template_id is not None:
         template = db.get(PromptTemplate, template_id)
         if template is None:
             raise BizError("提示词模板不存在")

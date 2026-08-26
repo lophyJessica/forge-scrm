@@ -69,6 +69,7 @@ class ScriptGenerateRequest(BaseModel):
     version_count: int = Field(3, ge=2, le=3, description="R5：每选题 2-3 版")
     material_ids: list[int] = Field(default_factory=list, description="可选资料追溯")
     prompt_template_id: int | None = None
+    prompt_content: str | None = Field(None, min_length=1, description="自定义提示词，优先于模板和内置")
 
 
 class ScriptGenerateResult(BaseModel):

@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Alert, Button, Card, Form, InputNumber, Select, Space, Table, message } from 'antd'
+import { Alert, Button, Card, Form, Input, InputNumber, Radio, Select, Space, Table, message } from 'antd'
 import { http } from '@/api/client'
 import { useMetaStore } from '@/store/meta'
-import type { MaterialOut, PageResult, PromptTemplateOut, ScriptOut, TopicOut } from '@/types'
+import type { MaterialOut, PageResult, ScriptOut, TopicOut } from '@/types'
+
+interface BuiltinPrompt {
+  task_type: '选题生成' | '脚本生成'
+  content: string
+}
 
 interface GenerateResult {
   topic_id: number
@@ -19,7 +24,7 @@ export default function ScriptGenerate() {
   const options = useMetaStore((s) => s.options)
   const [topics, setTopics] = useState<TopicOut[]>([])
   const [materials, setMaterials] = useState<MaterialOut[]>([])
-  const [templates, setTemplates] = useState<PromptTemplateOut[]>([])
+  const [builtinPrompts, setBuiltinPrompts] = useState<BuiltinPrompt[]>([])
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<GenerateResult | null>(null)
 
@@ -31,25 +36,37 @@ export default function ScriptGenerate() {
       .get<PageResult<MaterialOut>>('/materials', { params: { status: '已生效', page_size: 200 } })
       .then((r) => setMaterials(r.data.items))
     void http
-      .get<PageResult<PromptTemplateOut>>('/prompt-templates', {
-        params: { task_type: '脚本生成', page_size: 100 },
+      .get<BuiltinPrompt[]>('/prompt-templates/builtin')
+      .then((r) => {
+        const prompts = r.data.filter((item) => item.task_type === '脚本生成')
+        setBuiltinPrompts(prompts)
+        if (prompts[0]) form.setFieldValue('builtin_prompt_type', prompts[0].task_type)
       })
-      .then((r) => setTemplates(r.data.items))
     const topicId = search.get('topic_id')
     if (topicId) form.setFieldValue('topic_id', Number(topicId))
   }, [search, form])
 
   const run = async () => {
     const values = await form.validateFields()
+    const payload = {
+      topic_id: values.topic_id,
+      style: values.style,
+      content_elements: values.content_elements || [],
+      version_count: values.version_count,
+      material_ids: values.material_ids || [],
+      ...(values.prompt_mode === 'custom' ? { prompt_content: values.prompt_content } : {}),
+    }
     setLoading(true)
     try {
-      const { data } = await http.post<GenerateResult>('/scripts/generate', values)
+      const { data } = await http.post<GenerateResult>('/scripts/generate', payload)
       setResult(data)
       message.success(`已生成 ${data.generated} 版脚本`)
     } finally {
       setLoading(false)
     }
   }
+
+  const promptMode = Form.useWatch('prompt_mode', form) || 'builtin'
 
   return (
     <Space direction="vertical" style={{ width: '100%' }} size={16}>
@@ -64,7 +81,7 @@ export default function ScriptGenerate() {
           form={form}
           layout="vertical"
           style={{ maxWidth: 720 }}
-          initialValues={{ version_count: 3, content_elements: [] }}
+          initialValues={{ version_count: 3, content_elements: [], prompt_mode: 'builtin', builtin_prompt_type: '脚本生成' }}
         >
           <Form.Item name="topic_id" label="来源选题（仅「已选定」）" rules={[{ required: true }]}>
             <Select
@@ -89,9 +106,30 @@ export default function ScriptGenerate() {
               options={materials.map((m) => ({ label: `#${m.id} ${m.title}`, value: m.id }))}
             />
           </Form.Item>
-          <Form.Item name="prompt_template_id" label="提示词模板（可选）">
-            <Select allowClear options={templates.map((t) => ({ label: `${t.name} v${t.version}`, value: t.id }))} />
+          <Form.Item name="prompt_mode" label="提示词使用方式">
+            <Radio.Group options={[{ label: '内置模板', value: 'builtin' }, { label: '自定义', value: 'custom' }]} />
           </Form.Item>
+          {promptMode === 'builtin' ? (
+            <Form.Item name="builtin_prompt_type" label="内置提示词">
+              <Select
+                loading={!builtinPrompts.length}
+                placeholder="选择内置模板（默认即可）"
+                options={builtinPrompts.map((prompt) => ({
+                  value: prompt.task_type,
+                  label: `${prompt.task_type}：${prompt.content.replace(/\s+/g, ' ').slice(0, 30)}`,
+                }))}
+              />
+            </Form.Item>
+          ) : (
+            <Form.Item
+              name="prompt_content"
+              label="自定义提示词"
+              preserve={false}
+              rules={[{ required: true, whitespace: true, message: '请输入自定义提示词' }]}
+            >
+              <Input.TextArea rows={6} placeholder="输入自定义提示词，将替代内置模板和已配置模板生效" showCount />
+            </Form.Item>
+          )}
           <Button type="primary" loading={loading} onClick={run}>
             开始生成
           </Button>

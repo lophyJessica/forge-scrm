@@ -49,6 +49,7 @@ def generate_scripts(
         payload.version_count,
         payload.material_ids,
         payload.prompt_template_id,
+        payload.prompt_content,
     )
 
     try:

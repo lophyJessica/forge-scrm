@@ -66,6 +66,7 @@ class TopicGenerateRequest(BaseModel):
     specialty: Specialty
     material_ids: list[int] = Field(default_factory=list, description="参考资料（已生效资料）")
     prompt_template_id: int | None = Field(None, description="可选提示词模板；不传用内置默认模板")
+    prompt_content: str | None = Field(None, min_length=1, description="自定义提示词，优先于模板和内置")
     count: int = Field(10, ge=1, le=10, description="R4：每方向 10 条")
 
 
