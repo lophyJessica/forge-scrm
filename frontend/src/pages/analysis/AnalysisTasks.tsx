@@ -1,20 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Alert, Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, message } from 'antd'
+import { Alert, Button, Card, Form, Input, Modal, Popconfirm, Select, Table, Tag, message } from 'antd'
 import { http } from '@/api/client'
+import { TableActions } from '@/components/TableActions'
 import { useAuthStore } from '@/store/auth'
 import { PERM, useMetaStore } from '@/store/meta'
+import { TABLE_PAGINATION, statusTagColor } from '@/theme'
 import type { AnalysisTaskOut, MaterialOut, PageResult, PromptTemplateOut, RawDataOut } from '@/types'
-
-const STATUS_COLOR: Record<string, string> = {
-  待执行: 'default',
-  执行中: 'processing',
-  已完成: 'blue',
-  待审核: 'orange',
-  已确认: 'green',
-  失败: 'red',
-  已废弃: 'default',
-}
 
 export default function AnalysisTasks() {
   const [queryForm] = Form.useForm()
@@ -128,12 +120,13 @@ export default function AnalysisTasks() {
         rowKey="id"
         loading={loading}
         dataSource={rows}
-        pagination={{ current: page, total, pageSize: 20, onChange: (p) => load(p) }}
+        pagination={{ ...TABLE_PAGINATION, current: page, total, pageSize: 20, onChange: (p) => load(p) }}
         columns={[
           { title: 'ID', dataIndex: 'id', width: 70 },
           {
             title: '任务名称',
             dataIndex: 'name',
+            ellipsis: true,
             render: (v: string | null, r) => <a onClick={() => navigate(`/analysis/tasks/${r.id}`)}>{v || `任务 #${r.id}`}</a>,
           },
           { title: '类型', dataIndex: 'type', width: 160 },
@@ -141,37 +134,39 @@ export default function AnalysisTasks() {
             title: '状态',
             dataIndex: 'status',
             width: 110,
-            render: (v: string) => <Tag color={STATUS_COLOR[v]}>{v}</Tag>,
+            render: (v: string) => <Tag color={statusTagColor(v)}>{v}</Tag>,
           },
           { title: '重试次数', dataIndex: 'retry_count', width: 100 },
           { title: '创建时间', dataIndex: 'created_at', width: 190 },
           {
             title: '操作',
-            width: 220,
+            width: 180,
             render: (_, r) => (
-              <Space size={4}>
-                <Button size="small" onClick={() => navigate(`/analysis/tasks/${r.id}`)}>
-                  详情
-                </Button>
-                {['待执行', '失败'].includes(r.status) && can(PERM.分析任务执行) && (
-                  <Button size="small" type="primary" loading={running === r.id} onClick={() => execute(r.id)}>
-                    {r.status === '失败' ? '重新执行' : '执行'}
-                  </Button>
-                )}
-                {isAdmin() && (
-                  <Popconfirm title="确认删除？" onConfirm={() => remove(r.id)}>
-                    <Button size="small" danger>
-                      删除
+              <TableActions
+                items={[
+                  <Button key="d" size="small" onClick={() => navigate(`/analysis/tasks/${r.id}`)}>
+                    详情
+                  </Button>,
+                  ['待执行', '失败'].includes(r.status) && can(PERM.分析任务执行) ? (
+                    <Button key="run" size="small" type="primary" loading={running === r.id} onClick={() => execute(r.id)}>
+                      {r.status === '失败' ? '重新执行' : '执行'}
                     </Button>
-                  </Popconfirm>
-                )}
-              </Space>
+                  ) : null,
+                  isAdmin() ? (
+                    <Popconfirm key="del" title="确认删除？" onConfirm={() => remove(r.id)}>
+                      <Button size="small" type="link" danger>
+                        删除
+                      </Button>
+                    </Popconfirm>
+                  ) : null,
+                ]}
+              />
             ),
           },
         ]}
       />
 
-      <Modal open={open} title="新建分析任务" onCancel={() => setOpen(false)} onOk={create} width={720}>
+      <Modal open={open} title="新建分析任务" onCancel={() => setOpen(false)} onOk={create} width={720} okText="创建" cancelText="取消">
         <Form form={form} layout="vertical" initialValues={{ material_ids: [] }}>
           <Form.Item name="name" label="任务名称">
             <Input maxLength={100} placeholder="可留空" />

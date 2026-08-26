@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Button, Card, Empty, Space, Table, Tag, message } from 'antd'
+import { Button, Card, Empty, Table, Tag, message } from 'antd'
 import { http } from '@/api/client'
+import { TableActions } from '@/components/TableActions'
 import { useAuthStore } from '@/store/auth'
 import type { MaterialOut, PageResult } from '@/types'
 
@@ -71,14 +72,16 @@ export default function MaterialReview() {
             title: '操作',
             width: 180,
             render: (_, r) => (
-              <Space>
-                <Button type="primary" size="small" onClick={() => review(r.id, true)}>
-                  通过
-                </Button>
-                <Button danger size="small" onClick={() => review(r.id, false)}>
-                  驳回
-                </Button>
-              </Space>
+              <TableActions
+                items={[
+                  <Button key="ok" type="primary" size="small" onClick={() => review(r.id, true)}>
+                    通过
+                  </Button>,
+                  <Button key="no" size="small" type="link" danger onClick={() => review(r.id, false)}>
+                    驳回
+                  </Button>,
+                ]}
+              />
             ),
           },
         ]}

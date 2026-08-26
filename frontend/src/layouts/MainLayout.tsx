@@ -329,7 +329,7 @@ export default function MainLayout() {
             </Dropdown>
           </Space>
         </Header>
-        <Content style={{ margin: 16 }}>
+        <Content style={{ margin: 16, background: 'transparent' }}>
           {mustChangePassword && (
             <Alert
               type="warning"

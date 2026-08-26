@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Button, Card, Form, Input, Select, Space, message } from 'antd'
+import { Button, Card, Form, Input, Select, message } from 'antd'
 import { http } from '@/api/client'
 import { useMetaStore } from '@/store/meta'
 import type { MaterialOut, PageResult, TopicOut } from '@/types'
@@ -42,9 +42,9 @@ export default function TopicForm() {
   }
 
   return (
-    <Card title={isEdit ? '修改选题' : '手动新增选题'} style={{ width: '100%' }}>
-      <div style={{ width: '100%', maxWidth: 800 }}>
-        <Form form={form} layout="vertical" style={{ width: '100%' }} initialValues={{ material_ids: [] }}>
+    <Card title={isEdit ? '修改选题' : '手动新增选题'}>
+      <div style={{ maxWidth: 720 }}>
+        <Form form={form} layout="vertical" initialValues={{ material_ids: [] }}>
         <Form.Item name="title" label="选题标题" rules={[{ required: true }]}>
           <Input maxLength={200} showCount />
         </Form.Item>
@@ -79,12 +79,12 @@ export default function TopicForm() {
             options={materials.map((m) => ({ label: `#${m.id} ${m.title}`, value: m.id }))}
           />
         </Form.Item>
-        <Space>
+        <div className="form-actions">
+          <Button onClick={() => navigate(-1)}>取消</Button>
           <Button type="primary" loading={saving} onClick={submit}>
             保存
           </Button>
-          <Button onClick={() => navigate(-1)}>取消</Button>
-        </Space>
+        </div>
         </Form>
       </div>
     </Card>

@@ -20,6 +20,7 @@ import dayjs from 'dayjs'
 import { http } from '@/api/client'
 import { useAuthStore } from '@/store/auth'
 import { PERM, useMetaStore } from '@/store/meta'
+import { statusTagColor } from '@/theme'
 import type { AnalysisResultOut, AnalysisTaskOut, MaterialClassOut } from '@/types'
 
 export default function AnalysisTaskDetail() {
@@ -153,7 +154,7 @@ export default function AnalysisTaskDetail() {
       <Descriptions column={2} bordered size="small">
         <Descriptions.Item label="任务类型">{task.type}</Descriptions.Item>
         <Descriptions.Item label="状态">
-          <Tag>{task.status}</Tag>
+          <Tag color={statusTagColor(task.status)}>{task.status}</Tag>
         </Descriptions.Item>
         <Descriptions.Item label="重试次数">{task.retry_count ?? 0}</Descriptions.Item>
         <Descriptions.Item label="创建时间">{task.created_at}</Descriptions.Item>
@@ -238,7 +239,7 @@ export default function AnalysisTaskDetail() {
         )}
       />
 
-      <Modal open={!!matTarget} title="回写资料库" width={900} onCancel={() => setMatTarget(null)} onOk={submitMaterial}>
+      <Modal open={!!matTarget} title="回写资料库" width={720} onCancel={() => setMatTarget(null)} onOk={submitMaterial} okText="确认回写" cancelText="取消">
         <Alert
           type="info"
           showIcon
@@ -285,7 +286,7 @@ export default function AnalysisTaskDetail() {
         </Form>
       </Modal>
 
-      <Modal open={!!topicTarget} title="反哺选题库" width={900} onCancel={() => setTopicTarget(null)} onOk={submitTopic}>
+      <Modal open={!!topicTarget} title="反哺选题库" width={720} onCancel={() => setTopicTarget(null)} onOk={submitTopic} okText="确认反哺" cancelText="取消">
         <Alert
           type="info"
           showIcon
@@ -336,7 +337,7 @@ export default function AnalysisTaskDetail() {
         </Form>
       </Modal>
 
-      <Modal open={raw !== null} onCancel={() => setRaw(null)} footer={null} width={900} title="AI 原始响应留档">
+      <Modal open={raw !== null} onCancel={() => setRaw(null)} footer={null} width={720} title="AI 原始响应留档">
         <pre className="pre-wrap" style={{ maxHeight: 520, overflow: 'auto' }}>
           {raw}
         </pre>

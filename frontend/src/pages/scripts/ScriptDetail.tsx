@@ -4,6 +4,7 @@ import { Button, Card, Descriptions, Space, Tag, message } from 'antd'
 import { http } from '@/api/client'
 import { useAuthStore } from '@/store/auth'
 import { PERM } from '@/store/meta'
+import { statusTagColor } from '@/theme'
 import type { ScriptOut } from '@/types'
 
 export default function ScriptDetail() {
@@ -69,7 +70,7 @@ export default function ScriptDetail() {
     >
       <Descriptions column={2} bordered size="small" style={{ marginBottom: 16 }}>
         <Descriptions.Item label="状态">
-          <Tag>{script.status}</Tag>
+          <Tag color={statusTagColor(script.status)}>{script.status}</Tag>
         </Descriptions.Item>
         <Descriptions.Item label="当前版本">v{script.current_version}</Descriptions.Item>
         <Descriptions.Item label="来源选题">

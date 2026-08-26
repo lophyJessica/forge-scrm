@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Alert, Button, Card, Checkbox, Form, Input, Modal, Select, Space, Table, Tag, message } from 'antd'
+import { Alert, Button, Card, Checkbox, Form, Input, Modal, Select, Space, Switch, Table, Tag, message } from 'antd'
 import { http } from '@/api/client'
+import { TableActions } from '@/components/TableActions'
 import { useMetaStore } from '@/store/meta'
+import { TABLE_PAGINATION, statusTagColor } from '@/theme'
 import type { DataScope, DataSourceOut, MaterialClassOut, PageResult, UserOut } from '@/types'
 
 export default function Users() {
@@ -109,6 +111,7 @@ export default function Users() {
         rowKey="id"
         loading={loading}
         dataSource={rows}
+        pagination={{ ...TABLE_PAGINATION, pageSize: 20 }}
         columns={[
           { title: 'ID', dataIndex: 'id', width: 70 },
           { title: '账号', dataIndex: 'username', width: 160 },
@@ -121,8 +124,13 @@ export default function Users() {
           {
             title: '状态',
             dataIndex: 'status',
-            width: 90,
-            render: (v: string) => <Tag color={v === '启用' ? 'green' : 'default'}>{v}</Tag>,
+            width: 150,
+            render: (v: string, r) => (
+              <Space size={8}>
+                <Tag color={statusTagColor(v)}>{v}</Tag>
+                <Switch size="small" checked={v === '启用'} onChange={() => toggle(r)} />
+              </Space>
+            ),
           },
           {
             title: '功能权限',
@@ -147,19 +155,18 @@ export default function Users() {
           { title: '最近登录', dataIndex: 'last_login_at', width: 180, render: (v) => v || '—' },
           {
             title: '操作',
-            width: 240,
+            width: 180,
             render: (_, r) => (
-              <Space size={4}>
-                <Button size="small" onClick={() => openModal(r)}>
-                  编辑
-                </Button>
-                <Button size="small" onClick={() => setPwdTarget(r)}>
-                  重置密码
-                </Button>
-                <Button size="small" danger={r.status === '启用'} onClick={() => toggle(r)}>
-                  {r.status === '启用' ? '停用' : '启用'}
-                </Button>
-              </Space>
+              <TableActions
+                items={[
+                  <Button key="e" size="small" onClick={() => openModal(r)}>
+                    编辑
+                  </Button>,
+                  <Button key="p" size="small" onClick={() => setPwdTarget(r)}>
+                    重置密码
+                  </Button>,
+                ]}
+              />
             ),
           },
         ]}
@@ -168,9 +175,11 @@ export default function Users() {
       <Modal
         open={open}
         title={editing ? `编辑 ${editing.username}` : '新增成员'}
-        width={760}
+        width={720}
         onCancel={() => setOpen(false)}
         onOk={save}
+        okText="保存"
+        cancelText="取消"
       >
         <Form form={form} layout="vertical">
           {!editing && (
@@ -211,8 +220,11 @@ export default function Users() {
       <Modal
         open={!!pwdTarget}
         title={`重置 ${pwdTarget?.username} 的密码`}
+        width={520}
         onCancel={() => setPwdTarget(null)}
         onOk={resetPassword}
+        okText="确定"
+        cancelText="取消"
       >
         <Form form={pwdForm} layout="vertical">
           <Form.Item name="new_password" label="新密码（至少 6 位）" rules={[{ required: true, min: 6 }]}>

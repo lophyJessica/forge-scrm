@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Alert, Button, Card, Form, Input, Select, Space, message } from 'antd'
+import { Alert, Button, Card, Form, Input, Select, message } from 'antd'
 import { http } from '@/api/client'
 import { useMetaStore } from '@/store/meta'
 import type { MaterialOut, PageResult, ScriptOut, TopicOut } from '@/types'
@@ -61,8 +61,8 @@ export default function ScriptForm() {
             : '独立创建时可不选来源选题（topic_id 允许为空），后续可在此页面补录关联。'
         }
       />
-      <div style={{ width: '100%', maxWidth: 860 }}>
-        <Form form={form} layout="vertical" style={{ width: '100%' }} initialValues={{ content_elements: [] }}>
+      <div style={{ maxWidth: 720 }}>
+        <Form form={form} layout="vertical" initialValues={{ content_elements: [] }}>
         <Form.Item name="topic_id" label="来源选题（可选，可后补）">
           <Select
             allowClear
@@ -96,12 +96,12 @@ export default function ScriptForm() {
             <Input maxLength={200} placeholder="例如：调整开头钩子" />
           </Form.Item>
         )}
-        <Space>
+        <div className="form-actions">
+          <Button onClick={() => navigate(-1)}>取消</Button>
           <Button type="primary" loading={saving} onClick={submit}>
             保存
           </Button>
-          <Button onClick={() => navigate(-1)}>取消</Button>
-        </Space>
+        </div>
         </Form>
       </div>
     </Card>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button, Card, Form, Input, Modal, Select, Space, Switch, Table, Tag, message } from 'antd'
 import { http } from '@/api/client'
+import { TABLE_PAGINATION, statusTagColor } from '@/theme'
 import type { BenchmarkAccountOut, PageResult } from '@/types'
 
 function formatTime(value?: string | null) {
@@ -90,7 +91,7 @@ export default function BenchmarkAccounts() {
         loading={loading}
         dataSource={rows}
         scroll={{ x: 980 }}
-        pagination={{ current: page, total, pageSize: 20, onChange: (nextPage) => load(nextPage) }}
+        pagination={{ ...TABLE_PAGINATION, current: page, total, pageSize: 20, onChange: (nextPage) => load(nextPage) }}
         columns={[
           { title: '平台', dataIndex: 'platform', width: 120 },
           { title: '账号标识', dataIndex: 'account_identifier', width: 200 },
@@ -100,24 +101,26 @@ export default function BenchmarkAccounts() {
           {
             title: '状态',
             dataIndex: 'enabled',
-            width: 90,
-            render: (enabled: boolean) => <Tag color={enabled ? 'green' : 'default'}>{enabled ? '启用' : '已停用'}</Tag>,
+            width: 150,
+            render: (enabled: boolean, row) => (
+              <Space size={8}>
+                <Tag color={statusTagColor(enabled ? '启用' : '已停用')}>{enabled ? '启用' : '已停用'}</Tag>
+                <Switch size="small" checked={enabled} onChange={() => toggleEnabled(row)} />
+              </Space>
+            ),
           },
           {
             title: '操作',
-            width: 160,
+            width: 90,
             fixed: 'right',
             render: (_, row) => (
-              <Space size={4}>
-                <Button size="small" onClick={() => openModal(row)}>编辑</Button>
-                <Button size="small" onClick={() => toggleEnabled(row)}>{row.enabled ? '停用' : '启用'}</Button>
-              </Space>
+              <Button size="small" onClick={() => openModal(row)}>编辑</Button>
             ),
           },
         ]}
       />
 
-      <Modal open={modalOpen} title={editing ? '编辑对标账号' : '新建对标账号'} onCancel={() => setModalOpen(false)} onOk={save}>
+      <Modal open={modalOpen} title={editing ? '编辑对标账号' : '新建对标账号'} width={520} onCancel={() => setModalOpen(false)} onOk={save} okText="保存" cancelText="取消">
         <Form form={form} layout="vertical">
           <Form.Item name="platform" label="平台" rules={[{ required: true, message: '请输入平台' }]}>
             <Input maxLength={32} placeholder="例如：小红书" />

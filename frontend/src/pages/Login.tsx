@@ -29,7 +29,7 @@ export default function Login() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: '#f0f2f5',
+        background: '#f5f5f7',
       }}
     >
       <Card style={{ width: 380 }}>

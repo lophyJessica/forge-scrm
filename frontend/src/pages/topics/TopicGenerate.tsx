@@ -421,7 +421,7 @@ export default function TopicGenerate() {
         </div>
       </Card>
 
-      <Modal open={saveTemplateOpen} title="保存为模板" onCancel={() => setSaveTemplateOpen(false)} onOk={() => void saveTemplate()}>
+      <Modal open={saveTemplateOpen} title="保存为模板" width={520} onCancel={() => setSaveTemplateOpen(false)} onOk={() => void saveTemplate()} okText="保存" cancelText="取消">
         <Form layout="vertical">
           <Form.Item label="模板名称" required>
             <Input value={saveTemplateName} maxLength={100} onChange={(event) => setSaveTemplateName(event.target.value)} />

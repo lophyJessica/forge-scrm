@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, Space, Table, Tag, message } from 'antd'
+import { Button, Card, Table, Tag, Tooltip, message } from 'antd'
 import { http } from '@/api/client'
+import { TableActions } from '@/components/TableActions'
 import type { PageResult, ScriptOut } from '@/types'
 
 export default function ScriptReview() {
@@ -42,7 +43,7 @@ export default function ScriptReview() {
         }}
         columns={[
           { title: 'ID', dataIndex: 'id', width: 70 },
-          { title: '正文摘要', dataIndex: 'content', render: (v: string) => v.slice(0, 80) },
+          { title: '正文摘要', dataIndex: 'content', ellipsis: true, render: (v: string) => <Tooltip title={v}>{v}</Tooltip> },
           {
             title: '来源选题',
             dataIndex: 'topic_title',
@@ -55,17 +56,19 @@ export default function ScriptReview() {
             title: '操作',
             width: 220,
             render: (_, r) => (
-              <Space size={4}>
-                <Button size="small" onClick={() => navigate(`/scripts/${r.id}`)}>
-                  详情
-                </Button>
-                <Button size="small" type="primary" onClick={() => review(r.id, true)}>
-                  通过
-                </Button>
-                <Button size="small" danger onClick={() => review(r.id, false)}>
-                  驳回
-                </Button>
-              </Space>
+              <TableActions
+                items={[
+                  <Button key="d" size="small" onClick={() => navigate(`/scripts/${r.id}`)}>
+                    详情
+                  </Button>,
+                  <Button key="ok" size="small" type="primary" onClick={() => review(r.id, true)}>
+                    通过
+                  </Button>,
+                  <Button key="no" size="small" type="link" danger onClick={() => review(r.id, false)}>
+                    驳回
+                  </Button>,
+                ]}
+              />
             ),
           },
         ]}

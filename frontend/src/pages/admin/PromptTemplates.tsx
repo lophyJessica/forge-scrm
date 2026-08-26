@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tag, Typography, message } from 'antd'
 import { http } from '@/api/client'
+import { TableActions } from '@/components/TableActions'
 import { PERM } from '@/store/meta'
 import { useAuthStore } from '@/store/auth'
+import { TABLE_PAGINATION, statusTagColor } from '@/theme'
 import type { PageResult, PromptTemplateOut } from '@/types'
 
 const TASK_TYPE_OPTIONS = [
@@ -88,6 +90,7 @@ export default function PromptTemplates() {
           loading={loading}
           dataSource={rows}
           scroll={{ x: 980 }}
+          pagination={{ ...TABLE_PAGINATION, pageSize: 20 }}
           columns={[
             { title: '名称', dataIndex: 'name', width: 180 },
             { title: '任务类型', dataIndex: 'task_type', width: 120, render: (value: string) => <Tag>{value}</Tag> },
@@ -102,32 +105,45 @@ export default function PromptTemplates() {
             {
               title: '状态',
               dataIndex: 'status',
-              width: 90,
-              render: (value: string | null | undefined) => (
-                <Tag color={value === '启用' ? 'green' : 'red'}>{value || '停用'}</Tag>
+              width: 150,
+              render: (value: string | null | undefined, row) => (
+                <Space size={8}>
+                  <Tag color={statusTagColor(value || '停用')}>{value || '停用'}</Tag>
+                  {can(PERM.提示词配置) && (
+                    <Switch
+                      size="small"
+                      checked={row.status === '启用'}
+                      onChange={(checked) => void toggleStatus(row, checked)}
+                    />
+                  )}
+                </Space>
               ),
             },
             { title: '创建时间', dataIndex: 'created_at', width: 180, render: (value: string) => formatTime(value) },
             {
               title: '操作',
-              width: 210,
+              width: 140,
               fixed: 'right',
               render: (_, row) => (
-                <Space size={4}>
-                  {can(PERM.提示词配置) && <Button size="small" onClick={() => openModal(row)}>编辑</Button>}
-                  {can(PERM.提示词配置) && (
-                    <Switch
-                      size="small"
-                      checked={row.status === '启用'}
-                      checkedChildren="启用"
-                      unCheckedChildren="停用"
-                      onChange={(checked) => void toggleStatus(row, checked)}
-                    />
-                  )}
-                  <Popconfirm title="确认删除该模板？" description="删除后不可恢复；如果这是该任务类型的最后一条模板，后端会拒绝删除。" onConfirm={() => remove(row.id)}>
-                    <Button size="small" danger>删除</Button>
-                  </Popconfirm>
-                </Space>
+                <TableActions
+                  items={[
+                    can(PERM.提示词配置) ? (
+                      <Button key="e" size="small" onClick={() => openModal(row)}>
+                        编辑
+                      </Button>
+                    ) : null,
+                    <Popconfirm
+                      key="d"
+                      title="确认删除该模板？"
+                      description="删除后不可恢复；如果这是该任务类型的最后一条模板，后端会拒绝删除。"
+                      onConfirm={() => remove(row.id)}
+                    >
+                      <Button size="small" type="link" danger>
+                        删除
+                      </Button>
+                    </Popconfirm>,
+                  ]}
+                />
               ),
             },
           ]}
@@ -137,9 +153,11 @@ export default function PromptTemplates() {
       <Modal
         open={modalOpen}
         title={editing ? '编辑提示词模板' : '新建提示词模板'}
-        width={820}
+        width={720}
         onCancel={() => setModalOpen(false)}
         onOk={save}
+        okText="保存"
+        cancelText="取消"
       >
         <Form form={form} layout="vertical">
           <Form.Item name="name" label="模板名称" rules={[{ required: true, message: '请输入模板名称' }]}>

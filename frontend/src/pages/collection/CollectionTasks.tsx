@@ -3,17 +3,10 @@ import { isAxiosError } from 'axios'
 import { type Dayjs } from 'dayjs'
 import { Button, Card, DatePicker, Form, Input, Modal, Select, Space, Spin, Table, Tabs, Tag, Typography, message } from 'antd'
 import { http } from '@/api/client'
+import { TABLE_PAGINATION, statusTagColor } from '@/theme'
 import type { BenchmarkAccountOut, CollectionRecordOut, CollectionResultOut, CollectionTaskOut, PageResult } from '@/types'
 
 const { RangePicker } = DatePicker
-
-const STATUS_COLOR: Record<string, string> = {
-  pending: 'default',
-  running: 'processing',
-  success: 'success',
-  partial_success: 'warning',
-  failed: 'error',
-}
 
 const STATUS_LABEL: Record<string, string> = {
   pending: '待执行',
@@ -75,7 +68,7 @@ function TaskDetails({ taskId }: { taskId: number }) {
               scroll={{ x: 900 }}
               columns={[
                 { title: '账号 ID', dataIndex: 'benchmark_account_id', width: 90 },
-                { title: '状态', dataIndex: 'status', width: 90, render: (value: string) => <Tag color={STATUS_COLOR[value]}>{value}</Tag> },
+                { title: '状态', dataIndex: 'status', width: 90, render: (value: string) => <Tag color={statusTagColor(value === 'success' ? '已完成' : value === 'failed' ? '失败' : value === 'running' ? '执行中' : value)}>{value}</Tag> },
                 { title: '尝试次数', dataIndex: 'attempt_no', width: 90 },
                 { title: '条目数', dataIndex: 'item_count', width: 80 },
                 { title: 'HTTP', dataIndex: 'http_status', width: 80, render: (value: number | null) => value || '—' },
@@ -205,13 +198,13 @@ export default function CollectionTasks() {
         loading={loading}
         dataSource={rows}
         expandable={{ expandedRowRender: (row) => <TaskDetails taskId={row.id} /> }}
-        pagination={{ current: page, total, pageSize: 20, onChange: (nextPage) => load(nextPage) }}
+        pagination={{ ...TABLE_PAGINATION, current: page, total, pageSize: 20, onChange: (nextPage) => load(nextPage) }}
         scroll={{ x: 1050 }}
         columns={[
           { title: '任务编号', dataIndex: 'task_no', width: 190 },
           { title: '时间窗', width: 330, render: (_, row) => `${formatTime(row.time_window_start)} ~ ${formatTime(row.time_window_end)}` },
           { title: '进度', width: 150, render: (_, row) => `${row.success_count}/${row.total_count} 成功，${row.failure_count} 失败` },
-          { title: '状态', dataIndex: 'status', width: 110, render: (value: string) => <Tag color={STATUS_COLOR[value]}>{STATUS_LABEL[value] || value}</Tag> },
+          { title: '状态', dataIndex: 'status', width: 110, render: (value: string) => <Tag color={statusTagColor(STATUS_LABEL[value] || value)}>{STATUS_LABEL[value] || value}</Tag> },
           { title: '重试次数', dataIndex: 'retry_count', width: 90 },
           { title: '创建时间', dataIndex: 'created_at', width: 180, render: (value: string) => formatTime(value) },
           {
@@ -227,7 +220,7 @@ export default function CollectionTasks() {
         ]}
       />
 
-      <Modal open={modalOpen} title="新建采集任务" width={680} onCancel={() => setModalOpen(false)} onOk={create}>
+      <Modal open={modalOpen} title="新建采集任务" width={720} onCancel={() => setModalOpen(false)} onOk={create} okText="创建" cancelText="取消">
         <Form form={form} layout="vertical">
           <Form.Item name="account_ids" label="对标账号" rules={[{ required: true, message: '请选择至少一个对标账号' }]}>
             <Select mode="multiple" options={accounts.map((account) => ({ label: `${account.platform} / ${account.account_name || account.account_identifier}`, value: account.id }))} placeholder="选择启用中的对标账号" />

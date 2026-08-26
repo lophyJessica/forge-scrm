@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Alert, Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tag, message } from 'antd'
+import { Alert, Button, Card, Form, Input, Modal, Popconfirm, Select, Switch, Table, Tag, message } from 'antd'
 import { http } from '@/api/client'
+import { TableActions } from '@/components/TableActions'
 import { useAuthStore } from '@/store/auth'
 import { useMetaStore } from '@/store/meta'
+import { TABLE_PAGINATION, statusTagColor } from '@/theme'
 import type { DataSourceOut, PageResult } from '@/types'
 
 export default function DataSources() {
@@ -68,6 +70,7 @@ export default function DataSources() {
         rowKey="id"
         loading={loading}
         dataSource={rows}
+        pagination={{ ...TABLE_PAGINATION, pageSize: 20 }}
         columns={[
           { title: 'ID', dataIndex: 'id', width: 70 },
           { title: '名称', dataIndex: 'name' },
@@ -85,23 +88,25 @@ export default function DataSources() {
             title: '状态',
             dataIndex: 'status',
             width: 90,
-            render: (v: string) => <Tag color={v === '启用' ? 'green' : 'default'}>{v}</Tag>,
+            render: (v: string) => <Tag color={statusTagColor(v)}>{v}</Tag>,
           },
           {
             title: '操作',
             width: 150,
             render: (_, r) =>
               isAdmin() ? (
-                <Space size={4}>
-                  <Button size="small" onClick={() => openModal(r)}>
-                    编辑
-                  </Button>
-                  <Popconfirm title="确认删除？" onConfirm={() => remove(r.id)}>
-                    <Button size="small" danger>
-                      删除
-                    </Button>
-                  </Popconfirm>
-                </Space>
+                <TableActions
+                  items={[
+                    <Button key="e" size="small" onClick={() => openModal(r)}>
+                      编辑
+                    </Button>,
+                    <Popconfirm key="d" title="确认删除？" onConfirm={() => remove(r.id)}>
+                      <Button size="small" type="link" danger>
+                        删除
+                      </Button>
+                    </Popconfirm>,
+                  ]}
+                />
               ) : (
                 '—'
               ),
@@ -109,7 +114,7 @@ export default function DataSources() {
         ]}
       />
 
-      <Modal open={open} title={editing ? '编辑数据源' : '新增数据源'} onCancel={() => setOpen(false)} onOk={save}>
+      <Modal open={open} title={editing ? '编辑数据源' : '新增数据源'} width={520} onCancel={() => setOpen(false)} onOk={save} okText="保存" cancelText="取消">
         <Form form={form} layout="vertical">
           <Form.Item name="name" label="名称" rules={[{ required: true }]}>
             <Input maxLength={100} />

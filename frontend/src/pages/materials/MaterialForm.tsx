@@ -53,9 +53,9 @@ export default function MaterialForm() {
   }
 
   return (
-    <Card title={isEdit ? `编辑资料 #${id}` : '新建资料'} style={{ width: '100%' }}>
-      <div style={{ width: '100%', maxWidth: 900 }}>
-        <Form form={form} layout="vertical" style={{ width: '100%' }}>
+    <Card title={isEdit ? `编辑资料 #${id}` : '新建资料'}>
+      <div style={{ maxWidth: 720 }}>
+        <Form form={form} layout="vertical">
         <Form.Item name="title" label="标题" rules={[{ required: true, message: '标题必填' }]}>
           <Input maxLength={200} showCount />
         </Form.Item>
@@ -83,12 +83,12 @@ export default function MaterialForm() {
             options={tags.map((t) => ({ label: t.name, value: t.name }))}
           />
         </Form.Item>
-        <Space>
+        <div className="form-actions">
+          <Button onClick={() => navigate('/materials')}>取消</Button>
           <Button type="primary" loading={saving} onClick={() => submit()}>
             保存
           </Button>
-          <Button onClick={() => navigate('/materials')}>返回</Button>
-        </Space>
+        </div>
         </Form>
       </div>
     </Card>

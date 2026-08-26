@@ -3,17 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { type Dayjs } from 'dayjs'
 import { Button, Card, DatePicker, Form, Input, Modal, Progress, Select, Space, Table, Tag, message } from 'antd'
 import { http } from '@/api/client'
+import { TABLE_PAGINATION, statusTagColor } from '@/theme'
 import type { PageResult, ResearchTaskOut } from '@/types'
 
 const { RangePicker } = DatePicker
-
-const STATUS_COLOR: Record<string, string> = {
-  pending: 'default',
-  searching: 'processing',
-  organizing: 'processing',
-  success: 'success',
-  failed: 'error',
-}
 
 const STATUS_LABEL: Record<string, string> = {
   pending: '待执行',
@@ -116,7 +109,7 @@ export default function ResearchTasks() {
         rowKey="id"
         loading={loading}
         dataSource={rows}
-        pagination={{ current: page, total, pageSize: 20, onChange: (nextPage) => load(nextPage) }}
+        pagination={{ ...TABLE_PAGINATION, current: page, total, pageSize: 20, onChange: (nextPage) => load(nextPage) }}
         scroll={{ x: 1080 }}
         columns={[
           { title: '任务编号', dataIndex: 'task_no', width: 180 },
@@ -126,7 +119,7 @@ export default function ResearchTasks() {
             title: '状态',
             dataIndex: 'status',
             width: 110,
-            render: (value: string) => <Tag color={STATUS_COLOR[value]}>{STATUS_LABEL[value] || value}</Tag>,
+            render: (value: string) => <Tag color={statusTagColor(STATUS_LABEL[value] || value)}>{STATUS_LABEL[value] || value}</Tag>,
           },
           {
             title: '阶段进度',
@@ -142,7 +135,7 @@ export default function ResearchTasks() {
             width: 180,
             fixed: 'right',
             render: (_, row) => (
-              <Space size={4}>
+              <Space size={8}>
                 {['pending', 'failed'].includes(row.status) && (
                   <Button size="small" type="primary" loading={running === row.id} onClick={() => execute(row)}>
                     {row.status === 'failed' ? '重试' : '执行'}
@@ -155,7 +148,7 @@ export default function ResearchTasks() {
         ]}
       />
 
-      <Modal open={modalOpen} title="新建研究任务" width={680} onCancel={() => setModalOpen(false)} onOk={create}>
+      <Modal open={modalOpen} title="新建研究任务" width={720} onCancel={() => setModalOpen(false)} onOk={create} okText="创建" cancelText="取消">
         <Form form={form} layout="vertical">
           <Form.Item name="topic" label="研究主题" rules={[{ required: true, message: '请输入研究主题' }]}><Input maxLength={500} /></Form.Item>
           <Form.Item name="objective" label="研究目标" rules={[{ required: true, message: '请输入研究目标' }]}><Input.TextArea rows={4} /></Form.Item>

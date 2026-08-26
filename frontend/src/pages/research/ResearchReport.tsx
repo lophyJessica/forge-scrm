@@ -3,6 +3,7 @@ import { isAxiosError } from 'axios'
 import { useParams } from 'react-router-dom'
 import { Alert, Card, Descriptions, Divider, List, Skeleton, Space, Tag, Typography } from 'antd'
 import { http } from '@/api/client'
+import { statusTagColor } from '@/theme'
 import type { ResearchReferenceOut, ResearchReportOut } from '@/types'
 
 function pretty(value: Record<string, unknown> | null | undefined) {
@@ -51,7 +52,7 @@ export default function ResearchReport() {
         <Space align="center">
           <Typography.Title level={3} style={{ margin: 0 }}>{report.title}</Typography.Title>
           {report.is_ai_product && <Tag color="purple">AI 生成</Tag>}
-          <Tag color={report.status === 'success' ? 'green' : 'red'}>{report.status}</Tag>
+          <Tag color={statusTagColor(report.status === 'success' ? '已完成' : '失败')}>{report.status}</Tag>
         </Space>
         <Descriptions column={{ xs: 1, sm: 3 }} size="small" style={{ marginTop: 18 }}>
           <Descriptions.Item label="研究任务">#{report.research_task_id}</Descriptions.Item>

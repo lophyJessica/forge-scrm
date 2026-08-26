@@ -31,8 +31,8 @@ export default function Profile() {
         </Descriptions>
       </Card>
 
-      <Card title="修改密码" style={{ maxWidth: 480 }}>
-        <Form form={form} layout="vertical" onFinish={onFinish}>
+      <Card title="修改密码" style={{ maxWidth: 720 }}>
+        <Form form={form} layout="vertical" onFinish={onFinish} style={{ maxWidth: 720 }}>
           <Form.Item name="old_password" label="原密码" rules={[{ required: true }]}>
             <Input.Password />
           </Form.Item>
@@ -43,9 +43,11 @@ export default function Profile() {
           >
             <Input.Password />
           </Form.Item>
-          <Button type="primary" htmlType="submit">
-            提交
-          </Button>
+          <div className="form-actions">
+            <Button type="primary" htmlType="submit">
+              提交
+            </Button>
+          </div>
         </Form>
       </Card>
     </div>

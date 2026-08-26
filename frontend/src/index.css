@@ -8,7 +8,7 @@ body,
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Segoe UI',
     sans-serif;
-  background: #f0f2f5;
+  background: #f5f5f7;
   /* 一期定位为桌面端后台，最小宽度按 1280 设计 */
   min-width: 1280px;
 }
@@ -17,6 +17,13 @@ body {
   background: #fff;
   border-radius: 8px;
   padding: 16px;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 .pre-wrap {

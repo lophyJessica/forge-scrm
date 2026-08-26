@@ -11,21 +11,15 @@ import {
   Space,
   Table,
   Tag,
+  Tooltip,
   message,
 } from 'antd'
 import { http } from '@/api/client'
+import { TableActions } from '@/components/TableActions'
 import { useAuthStore } from '@/store/auth'
 import { PERM, useMetaStore } from '@/store/meta'
+import { TABLE_PAGINATION, statusTagColor } from '@/theme'
 import type { MaterialClassOut, MaterialOut, PageResult, TagOut } from '@/types'
-
-const STATUS_COLOR: Record<string, string> = {
-  草稿: 'default',
-  待审核: 'orange',
-  已生效: 'green',
-  已停用: 'volcano',
-  已过期: 'red',
-  已废弃: 'default',
-}
 
 export default function MaterialList() {
   const [form] = Form.useForm()
@@ -130,23 +124,25 @@ export default function MaterialList() {
         rowKey="id"
         loading={loading}
         dataSource={rows}
-        pagination={{ current: page, total, pageSize: 20, onChange: (p) => load(p) }}
+        pagination={{ ...TABLE_PAGINATION, current: page, total, pageSize: 20, onChange: (p) => load(p) }}
         columns={[
           { title: 'ID', dataIndex: 'id', width: 70 },
           {
             title: '标题',
             dataIndex: 'title',
+            ellipsis: true,
             render: (v: string, r) => (
               <a onClick={() => setDetail(r)}>
-                {v} {r.is_ai_product && <Tag color="purple">AI 产物</Tag>}
+                <Tooltip title={v}>{v}</Tooltip> {r.is_ai_product && <Tag color="purple">AI 产物</Tag>}
               </a>
             ),
           },
-          { title: '分类', dataIndex: 'class_name', width: 130 },
+          { title: '分类', dataIndex: 'class_name', width: 120, ellipsis: true },
           {
             title: '标签',
             dataIndex: 'tags',
-            width: 180,
+            width: 160,
+            ellipsis: true,
             render: (v: string[]) => v.map((t) => <Tag key={t}>{t}</Tag>),
           },
           { title: '来源', dataIndex: 'source_type', width: 90 },
@@ -160,51 +156,54 @@ export default function MaterialList() {
             title: '状态',
             dataIndex: 'status',
             width: 90,
-            render: (v: string) => <Tag color={STATUS_COLOR[v]}>{v}</Tag>,
+            render: (v: string) => <Tag color={statusTagColor(v)}>{v}</Tag>,
           },
           {
             title: '操作',
-            width: 260,
+            width: 180,
             render: (_, r) => (
-              <Space size={4} wrap>
-                <Button size="small" onClick={() => navigate(`/materials/${r.id}`)}>
-                  编辑
-                </Button>
-                {r.status === '草稿' && (
-                  <Button size="small" onClick={() => act(r.id, 'submit')}>
-                    提交审核
-                  </Button>
-                )}
-                {r.status === '已生效' && (
-                  <Button size="small" onClick={() => act(r.id, 'disable')}>
-                    停用
-                  </Button>
-                )}
-                {r.status === '已停用' && (
-                  <Button size="small" onClick={() => act(r.id, 'enable')}>
-                    启用
-                  </Button>
-                )}
-                {r.status === '已过期' && (
-                  <Button size="small" onClick={() => act(r.id, 'discard')}>
-                    确认废弃
-                  </Button>
-                )}
-                {can(PERM.材料删除) && (
-                  <Popconfirm
-                    title="确认删除该资料？"
-                    onConfirm={async () => {
-                      await http.delete(`/materials/${r.id}`)
-                      message.success('已删除')
-                      void load()
-                    }}
-                  >
-                    <Button size="small" danger>
-                      删除
+              <TableActions
+                items={[
+                  <Button key="edit" size="small" onClick={() => navigate(`/materials/${r.id}`)}>
+                    编辑
+                  </Button>,
+                  r.status === '草稿' ? (
+                    <Button key="submit" size="small" onClick={() => act(r.id, 'submit')}>
+                      提交审核
                     </Button>
-                  </Popconfirm>
-                )}
-              </Space>
+                  ) : null,
+                  r.status === '已生效' ? (
+                    <Button key="disable" size="small" onClick={() => act(r.id, 'disable')}>
+                      停用
+                    </Button>
+                  ) : null,
+                  r.status === '已停用' ? (
+                    <Button key="enable" size="small" onClick={() => act(r.id, 'enable')}>
+                      启用
+                    </Button>
+                  ) : null,
+                  r.status === '已过期' ? (
+                    <Button key="discard" size="small" danger onClick={() => act(r.id, 'discard')}>
+                      确认废弃
+                    </Button>
+                  ) : null,
+                  can(PERM.材料删除) ? (
+                    <Popconfirm
+                      key="del"
+                      title="确认删除该资料？"
+                      onConfirm={async () => {
+                        await http.delete(`/materials/${r.id}`)
+                        message.success('已删除')
+                        void load()
+                      }}
+                    >
+                      <Button size="small" type="link" danger>
+                        删除
+                      </Button>
+                    </Popconfirm>
+                  ) : null,
+                ]}
+              />
             ),
           },
         ]}
@@ -213,7 +212,7 @@ export default function MaterialList() {
       <Modal
         open={!!detail}
         title={detail?.title}
-        width={760}
+        width={720}
         footer={null}
         onCancel={() => setDetail(null)}
       >

@@ -4,6 +4,7 @@ import { Button, Card, Descriptions, Modal, Space, Tag, Typography, message } fr
 import { http } from '@/api/client'
 import { useAuthStore } from '@/store/auth'
 import { PERM } from '@/store/meta'
+import { statusTagColor } from '@/theme'
 import type { TopicOut } from '@/types'
 
 export default function TopicDetail() {
@@ -67,7 +68,7 @@ export default function TopicDetail() {
           {topic.title}
         </Descriptions.Item>
         <Descriptions.Item label="状态">
-          <Tag>{topic.status}</Tag>
+          <Tag color={statusTagColor(topic.status)}>{topic.status}</Tag>
         </Descriptions.Item>
         <Descriptions.Item label="筛选结果">{topic.screening_result || '—'}</Descriptions.Item>
         <Descriptions.Item label="业务方向">{topic.direction}</Descriptions.Item>
@@ -91,7 +92,7 @@ export default function TopicDetail() {
         </Descriptions.Item>
       </Descriptions>
 
-      <Modal open={raw !== null} onCancel={() => setRaw(null)} footer={null} width={900} title="AI 原始响应留档">
+      <Modal open={raw !== null} onCancel={() => setRaw(null)} footer={null} width={720} title="AI 原始响应留档">
         <pre className="pre-wrap" style={{ maxHeight: 500, overflow: 'auto' }}>
           {raw}
         </pre>

@@ -1,17 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Card, Form, Input, Select, Space, Table, Tag, Typography, message } from 'antd'
+import { Button, Card, Form, Input, Select, Space, Table, Tag, Tooltip, Typography, message } from 'antd'
 import { http } from '@/api/client'
+import { TableActions } from '@/components/TableActions'
 import { useMetaStore } from '@/store/meta'
+import { TABLE_PAGINATION, statusTagColor } from '@/theme'
 import type { PageResult, ScriptOut } from '@/types'
-
-const STATUS_COLOR: Record<string, string> = {
-  草稿: 'default',
-  待审核: 'orange',
-  已通过: 'green',
-  已使用: 'purple',
-  已废弃: 'red',
-}
 
 export default function ScriptList() {
   const [form] = Form.useForm()
@@ -101,24 +95,28 @@ export default function ScriptList() {
         rowKey="id"
         loading={loading}
         dataSource={rows}
-        pagination={{ current: page, total, pageSize: 20, onChange: (p) => load(p) }}
+        pagination={{ ...TABLE_PAGINATION, current: page, total, pageSize: 20, onChange: (p) => load(p) }}
         columns={[
           { title: 'ID', dataIndex: 'id', width: 70 },
           {
             title: '正文摘要',
             dataIndex: 'content',
+            ellipsis: true,
             render: (v: string, r) => (
               <a onClick={() => navigate(`/scripts/${r.id}`)}>
-                <Typography.Text ellipsis style={{ maxWidth: 380 }}>
-                  {v.slice(0, 60)}
-                </Typography.Text>
+                <Tooltip title={v}>
+                  <Typography.Text ellipsis style={{ maxWidth: 360 }}>
+                    {v}
+                  </Typography.Text>
+                </Tooltip>
               </a>
             ),
           },
           {
             title: '来源选题',
             dataIndex: 'topic_title',
-            width: 200,
+            width: 180,
+            ellipsis: true,
             render: (v: string | null, r) =>
               r.topic_id ? <a onClick={() => navigate(`/topics/${r.topic_id}`)}>{v || `#${r.topic_id}`}</a> : <Tag>独立创建</Tag>,
           },
@@ -128,35 +126,37 @@ export default function ScriptList() {
             title: '状态',
             dataIndex: 'status',
             width: 100,
-            render: (v: string) => <Tag color={STATUS_COLOR[v]}>{v}</Tag>,
+            render: (v: string) => <Tag color={statusTagColor(v)}>{v}</Tag>,
           },
           {
             title: '操作',
-            width: 280,
+            width: 180,
             render: (_, r) => (
-              <Space size={4}>
-                <Button size="small" onClick={() => navigate(`/scripts/${r.id}`)}>
-                  详情
-                </Button>
-                <Button size="small" onClick={() => navigate(`/scripts/${r.id}/versions`)}>
-                  版本
-                </Button>
-                {r.status === '草稿' && (
-                  <Button size="small" type="primary" onClick={() => act(r.id, 'submit', '已提交审核')}>
-                    提交审核
-                  </Button>
-                )}
-                {r.status === '已通过' && (
-                  <Button size="small" type="primary" onClick={() => act(r.id, 'mark-used', '已标记为已使用')}>
-                    标记已使用
-                  </Button>
-                )}
-                {['草稿', '待审核', '已通过'].includes(r.status) && (
-                  <Button size="small" danger onClick={() => act(r.id, 'discard', '已废弃')}>
-                    废弃
-                  </Button>
-                )}
-              </Space>
+              <TableActions
+                items={[
+                  <Button key="d" size="small" onClick={() => navigate(`/scripts/${r.id}`)}>
+                    详情
+                  </Button>,
+                  <Button key="v" size="small" onClick={() => navigate(`/scripts/${r.id}/versions`)}>
+                    版本
+                  </Button>,
+                  r.status === '草稿' ? (
+                    <Button key="s" size="small" type="primary" onClick={() => act(r.id, 'submit', '已提交审核')}>
+                      提交审核
+                    </Button>
+                  ) : null,
+                  r.status === '已通过' ? (
+                    <Button key="u" size="small" type="primary" onClick={() => act(r.id, 'mark-used', '已标记为已使用')}>
+                      标记已使用
+                    </Button>
+                  ) : null,
+                  ['草稿', '待审核', '已通过'].includes(r.status) ? (
+                    <Button key="x" size="small" type="link" danger onClick={() => act(r.id, 'discard', '已废弃')}>
+                      废弃
+                    </Button>
+                  ) : null,
+                ]}
+              />
             ),
           },
         ]}

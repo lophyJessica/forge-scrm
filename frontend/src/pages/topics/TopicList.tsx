@@ -1,17 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Card, Form, Input, Select, Space, Table, Tag, message } from 'antd'
+import { Button, Card, Form, Input, Select, Space, Table, Tag, Tooltip, message } from 'antd'
 import { http } from '@/api/client'
+import { TableActions } from '@/components/TableActions'
 import { useMetaStore } from '@/store/meta'
+import { TABLE_PAGINATION, statusTagColor } from '@/theme'
 import type { PageResult, TopicOut } from '@/types'
-
-const STATUS_COLOR: Record<string, string> = {
-  待筛选: 'orange',
-  已选定: 'green',
-  已生成脚本: 'blue',
-  已使用: 'purple',
-  已废弃: 'default',
-}
 
 export default function TopicList() {
   const [form] = Form.useForm()
@@ -104,16 +98,21 @@ export default function TopicList() {
         rowKey="id"
         loading={loading}
         dataSource={rows}
-        pagination={{ current: page, total, pageSize: 20, onChange: (p) => load(p) }}
+        pagination={{ ...TABLE_PAGINATION, current: page, total, pageSize: 20, onChange: (p) => load(p) }}
         columns={[
           { title: 'ID', dataIndex: 'id', width: 70 },
           {
             title: '标题',
             dataIndex: 'title',
-            render: (v: string, r) => <a onClick={() => navigate(`/topics/${r.id}`)}>{v}</a>,
+            ellipsis: true,
+            render: (v: string, r) => (
+              <a onClick={() => navigate(`/topics/${r.id}`)}>
+                <Tooltip title={v}>{v}</Tooltip>
+              </a>
+            ),
           },
-          { title: '业务方向', dataIndex: 'direction', width: 130 },
-          { title: '专业方向', dataIndex: 'specialty', width: 200 },
+          { title: '业务方向', dataIndex: 'direction', width: 130, ellipsis: true },
+          { title: '专业方向', dataIndex: 'specialty', width: 160, ellipsis: true },
           {
             title: '批次',
             dataIndex: 'batch_no',
@@ -124,27 +123,29 @@ export default function TopicList() {
             title: '状态',
             dataIndex: 'status',
             width: 110,
-            render: (v: string) => <Tag color={STATUS_COLOR[v]}>{v}</Tag>,
+            render: (v: string) => <Tag color={statusTagColor(v)}>{v}</Tag>,
           },
           {
             title: '操作',
-            width: 220,
+            width: 180,
             render: (_, r) => (
-              <Space size={4}>
-                <Button size="small" onClick={() => navigate(`/topics/${r.id}`)}>
-                  详情
-                </Button>
-                {r.status === '待筛选' && (
-                  <>
-                    <Button type="primary" size="small" onClick={() => screen(r.id, '选中')}>
+              <TableActions
+                items={[
+                  <Button key="detail" size="small" onClick={() => navigate(`/topics/${r.id}`)}>
+                    详情
+                  </Button>,
+                  r.status === '待筛选' ? (
+                    <Button key="ok" type="primary" size="small" onClick={() => screen(r.id, '选中')}>
                       选中
                     </Button>
-                    <Button size="small" danger onClick={() => screen(r.id, '淘汰')}>
+                  ) : null,
+                  r.status === '待筛选' ? (
+                    <Button key="no" size="small" type="link" danger onClick={() => screen(r.id, '淘汰')}>
                       淘汰
                     </Button>
-                  </>
-                )}
-              </Space>
+                  ) : null,
+                ]}
+              />
             ),
           },
         ]}

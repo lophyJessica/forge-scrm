@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Card, Table } from 'antd'
 import { http } from '@/api/client'
+import { TABLE_PAGINATION } from '@/theme'
 import type { TopicBatchOut } from '@/types'
 
 export default function TopicBatches() {
@@ -23,6 +24,7 @@ export default function TopicBatches() {
         rowKey="batch_no"
         loading={loading}
         dataSource={rows}
+        pagination={{ ...TABLE_PAGINATION, pageSize: 20 }}
         columns={[
           { title: '批次号', dataIndex: 'batch_no', width: 220 },
           { title: '业务方向', dataIndex: 'direction' },

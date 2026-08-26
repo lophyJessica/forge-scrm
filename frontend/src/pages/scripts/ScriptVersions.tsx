@@ -80,13 +80,13 @@ export default function ScriptVersions() {
             title: '操作',
             width: 180,
             render: (_, r) => (
-              <Space size={4}>
+              <Space size={8}>
                 <Button size="small" onClick={() => setPreview(r)}>
                   查看快照
                 </Button>
                 {can(PERM.脚本版本回退) && (
                   <Popconfirm title={`确认回退到 v${r.version}？`} onConfirm={() => rollback(r.version)}>
-                    <Button size="small" danger>
+                    <Button size="small" type="link" danger>
                       回退
                     </Button>
                   </Popconfirm>
@@ -97,7 +97,7 @@ export default function ScriptVersions() {
         ]}
       />
 
-      <Modal open={!!diff} onCancel={() => setDiff(null)} footer={null} width={1000} title="版本差异">
+      <Modal open={!!diff} onCancel={() => setDiff(null)} footer={null} width={720} title="版本差异">
         <pre className="pre-wrap" style={{ maxHeight: 520, overflow: 'auto' }}>
           {diff?.diff || '（两版本内容一致）'}
         </pre>
@@ -106,7 +106,7 @@ export default function ScriptVersions() {
         open={!!preview}
         onCancel={() => setPreview(null)}
         footer={null}
-        width={900}
+        width={720}
         title={`v${preview?.version} 内容快照`}
       >
         <pre className="pre-wrap" style={{ maxHeight: 520, overflow: 'auto' }}>

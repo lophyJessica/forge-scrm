@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Alert, Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, message } from 'antd'
+import { Alert, Button, Card, Form, Input, Modal, Popconfirm, Select, Table, Tag, message } from 'antd'
 import { http } from '@/api/client'
+import { TableActions } from '@/components/TableActions'
 import { useAuthStore } from '@/store/auth'
 import { PERM, useMetaStore } from '@/store/meta'
+import { TABLE_PAGINATION, statusTagColor } from '@/theme'
 import type { PageResult, PromptTemplateOut } from '@/types'
 
 export default function PromptTemplates() {
@@ -107,6 +109,7 @@ export default function PromptTemplates() {
         rowKey="id"
         loading={loading}
         dataSource={rows}
+        pagination={{ ...TABLE_PAGINATION, pageSize: 20 }}
         columns={[
           { title: 'ID', dataIndex: 'id', width: 70 },
           { title: '名称', dataIndex: 'name', render: (v, r) => <a onClick={() => setView(r)}>{v}</a> },
@@ -116,36 +119,38 @@ export default function PromptTemplates() {
             title: '状态',
             dataIndex: 'status',
             width: 90,
-            render: (v: string) => <Tag color={v === '启用' ? 'green' : 'default'}>{v}</Tag>,
+            render: (v: string) => <Tag color={statusTagColor(v)}>{v}</Tag>,
           },
           { title: '创建时间', dataIndex: 'created_at', width: 190 },
           {
             title: '操作',
             width: 180,
             render: (_, r) => (
-              <Space size={4}>
-                <Button size="small" onClick={() => setView(r)}>
-                  查看
-                </Button>
-                {can(PERM.提示词配置) && (
-                  <Button size="small" onClick={() => openModal(r)}>
-                    编辑
-                  </Button>
-                )}
-                {isAdmin() && (
-                  <Popconfirm title="确认删除？" onConfirm={() => remove(r.id)}>
-                    <Button size="small" danger>
-                      删除
+              <TableActions
+                items={[
+                  <Button key="v" size="small" onClick={() => setView(r)}>
+                    查看
+                  </Button>,
+                  can(PERM.提示词配置) ? (
+                    <Button key="e" size="small" onClick={() => openModal(r)}>
+                      编辑
                     </Button>
-                  </Popconfirm>
-                )}
-              </Space>
+                  ) : null,
+                  isAdmin() ? (
+                    <Popconfirm key="d" title="确认删除？" onConfirm={() => remove(r.id)}>
+                      <Button size="small" type="link" danger>
+                        删除
+                      </Button>
+                    </Popconfirm>
+                  ) : null,
+                ]}
+              />
             ),
           },
         ]}
       />
 
-      <Modal open={open} title={editing ? '编辑提示词模板' : '新增提示词模板'} width={800} onCancel={() => setOpen(false)} onOk={save}>
+      <Modal open={open} title={editing ? '编辑提示词模板' : '新增提示词模板'} width={720} onCancel={() => setOpen(false)} onOk={save} okText="保存" cancelText="取消">
         <Form form={form} layout="vertical">
           <Form.Item name="task_type" label="任务类型" rules={[{ required: true }]}>
             <Select options={options('prompt_task_type')} disabled={!!editing} />
@@ -165,7 +170,7 @@ export default function PromptTemplates() {
         </Form>
       </Modal>
 
-      <Modal open={!!view} title={view?.name} width={800} footer={null} onCancel={() => setView(null)}>
+      <Modal open={!!view} title={view?.name} width={720} footer={null} onCancel={() => setView(null)}>
         <p>
           任务类型：{view?.task_type} · 版本 v{view?.version} · 状态 {view?.status}
         </p>

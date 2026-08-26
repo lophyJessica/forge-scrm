@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Button, Card, Form, Input, InputNumber, Modal, Popconfirm, Space, Table, message } from 'antd'
+import { Button, Card, Form, Input, InputNumber, Modal, Popconfirm, Table, message } from 'antd'
 import { http } from '@/api/client'
+import { TableActions } from '@/components/TableActions'
 import { useAuthStore } from '@/store/auth'
 import type { MaterialClassOut } from '@/types'
 
@@ -61,30 +62,34 @@ export default function MaterialClasses() {
             width: 160,
             render: (_, r) =>
               isAdmin && (
-                <Space>
-                  <Button
-                    size="small"
-                    onClick={() => {
-                      setEditing(r)
-                      form.setFieldsValue(r)
-                      setOpen(true)
-                    }}
-                  >
-                    编辑
-                  </Button>
-                  <Popconfirm
-                    title="确认删除该分类？"
-                    onConfirm={async () => {
-                      await http.delete(`/material-classes/${r.id}`)
-                      message.success('已删除')
-                      void load()
-                    }}
-                  >
-                    <Button size="small" danger>
-                      删除
-                    </Button>
-                  </Popconfirm>
-                </Space>
+                <TableActions
+                  items={[
+                    <Button
+                      key="edit"
+                      size="small"
+                      onClick={() => {
+                        setEditing(r)
+                        form.setFieldsValue(r)
+                        setOpen(true)
+                      }}
+                    >
+                      编辑
+                    </Button>,
+                    <Popconfirm
+                      key="del"
+                      title="确认删除该分类？"
+                      onConfirm={async () => {
+                        await http.delete(`/material-classes/${r.id}`)
+                        message.success('已删除')
+                        void load()
+                      }}
+                    >
+                      <Button size="small" type="link" danger>
+                        删除
+                      </Button>
+                    </Popconfirm>,
+                  ]}
+                />
               ),
           },
         ]}
@@ -93,8 +98,11 @@ export default function MaterialClasses() {
       <Modal
         open={open}
         title={editing ? '编辑分类' : '新建分类'}
+        width={520}
         onCancel={() => setOpen(false)}
         onOk={save}
+        okText="保存"
+        cancelText="取消"
       >
         <Form form={form} layout="vertical">
           <Form.Item name="name" label="分类名" rules={[{ required: true }]}>

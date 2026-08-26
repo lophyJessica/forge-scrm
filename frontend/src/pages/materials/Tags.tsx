@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button, Card, Form, Input, Space, Table, message } from 'antd'
 import { http } from '@/api/client'
+import { TABLE_PAGINATION } from '@/theme'
 import { useAuthStore } from '@/store/auth'
 import { PERM } from '@/store/meta'
 import type { TagOut } from '@/types'
@@ -52,7 +53,7 @@ export default function Tags() {
       <Table<TagOut>
         rowKey="id"
         dataSource={rows}
-        pagination={{ pageSize: 20 }}
+        pagination={{ ...TABLE_PAGINATION, pageSize: 20 }}
         columns={[
           { title: 'ID', dataIndex: 'id', width: 80 },
           { title: '标签名', dataIndex: 'name' },

@@ -18,8 +18,10 @@ import {
 import { UploadOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { download, http } from '@/api/client'
+import { TableActions } from '@/components/TableActions'
 import { useAuthStore } from '@/store/auth'
 import { PERM } from '@/store/meta'
+import { TABLE_PAGINATION } from '@/theme'
 import type { DataSourceOut, PageResult, RawDataImportResult, RawDataOut } from '@/types'
 
 const FMT = 'YYYY-MM-DD HH:mm:ss'
@@ -152,7 +154,7 @@ export default function RawData() {
                   rowKey="id"
                   loading={loading}
                   dataSource={rows}
-                  pagination={{ current: page, total, pageSize: 20, onChange: (p) => load(p) }}
+                  pagination={{ ...TABLE_PAGINATION, current: page, total, pageSize: 20, onChange: (p) => load(p) }}
                   expandable={{
                     expandedRowRender: (r) => (
                       <>
@@ -167,7 +169,8 @@ export default function RawData() {
                     {
                       title: '原始内容',
                       dataIndex: 'raw_content',
-                      render: (v: string | null) => (v || '').slice(0, 60),
+                      ellipsis: true,
+                      render: (v: string | null) => v || '—',
                     },
                     { title: '采集时间', dataIndex: 'collected_at', width: 180 },
                     { title: '时间窗开始', dataIndex: 'window_start', width: 180 },
@@ -176,20 +179,22 @@ export default function RawData() {
                       title: '操作',
                       width: 150,
                       render: (_, r) => (
-                        <Space size={4}>
-                          {can(PERM.数据录入导入) && (
-                            <Button size="small" onClick={() => openModal(r)}>
-                              编辑
-                            </Button>
-                          )}
-                          {isAdmin() && (
-                            <Popconfirm title="确认删除？" onConfirm={() => remove(r.id)}>
-                              <Button size="small" danger>
-                                删除
+                        <TableActions
+                          items={[
+                            can(PERM.数据录入导入) ? (
+                              <Button key="e" size="small" onClick={() => openModal(r)}>
+                                编辑
                               </Button>
-                            </Popconfirm>
-                          )}
-                        </Space>
+                            ) : null,
+                            isAdmin() ? (
+                              <Popconfirm key="d" title="确认删除？" onConfirm={() => remove(r.id)}>
+                                <Button size="small" type="link" danger>
+                                  删除
+                                </Button>
+                              </Popconfirm>
+                            ) : null,
+                          ]}
+                        />
                       ),
                     },
                   ]}
@@ -258,7 +263,7 @@ export default function RawData() {
         ]}
       />
 
-      <Modal open={open} title={editing ? '编辑原始数据' : '手动录入原始数据'} onCancel={() => setOpen(false)} onOk={save} width={720}>
+      <Modal open={open} title={editing ? '编辑原始数据' : '手动录入原始数据'} onCancel={() => setOpen(false)} onOk={save} width={720} okText="保存" cancelText="取消">
         <Form form={form} layout="vertical">
           <Form.Item name="source_id" label="数据源" rules={[{ required: true }]}>
             <Select options={sources.map((s) => ({ label: s.name, value: s.id }))} disabled={!!editing} />
