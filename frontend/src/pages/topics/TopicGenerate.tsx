@@ -379,11 +379,9 @@ export default function TopicGenerate() {
                 <Select
                   loading={!builtinPrompts.length}
                   placeholder="选择模板（默认即可）"
-                  optionLabelProp="shortLabel"
                   options={builtinPrompts.map((prompt) => ({
                     value: prompt.task_type,
                     label: `${prompt.task_type}：${prompt.content}`,
-                    shortLabel: prompt.task_type,
                   }))}
                   optionRender={(option) => (
                     <div style={{ whiteSpace: 'normal', lineHeight: 1.5 }}>{option.data.label}</div>
