@@ -19,6 +19,15 @@ from app.models.direction import BusinessDirection, Specialty
 from app.models.script import Script, ScriptVersion
 from app.models.topic import Topic, TopicMaterial
 from app.models.user import User
+from app.models.phase2 import (
+    BenchmarkAccount,
+    CollectionRecord,
+    CollectionResult,
+    CollectionTask,
+    ResearchReference,
+    ResearchReport,
+    ResearchTask,
+)
 
 __all__ = [
     "Base",
@@ -41,4 +50,11 @@ __all__ = [
     "AnalysisResult",
     "AnalysisResultMaterial",
     "AnalysisResultTopic",
+    "BenchmarkAccount",
+    "CollectionTask",
+    "CollectionRecord",
+    "CollectionResult",
+    "ResearchTask",
+    "ResearchReport",
+    "ResearchReference",
 ]

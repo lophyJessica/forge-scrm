@@ -54,12 +54,24 @@ def _register_routers() -> None:
         materials,
         meta,
         prompts,
+        phase2,
         scripts,
         topics,
         users,
     )
 
-    for module in (auth, users, meta, materials, topics, scripts, analysis, prompts, directions):
+    for module in (
+        auth,
+        users,
+        meta,
+        materials,
+        topics,
+        scripts,
+        analysis,
+        prompts,
+        directions,
+        phase2,
+    ):
         app.include_router(module.router)
 
 
