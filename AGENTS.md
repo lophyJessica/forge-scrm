@@ -92,7 +92,7 @@ context/ > templates/ > prd-docs/ > draft/
 报告上传到审核管道：
 
 ```bash
-curl -X POST "https://pmlophy.com/p/jarvis/file/upload" -H "X-Jarvis-User: ai-reports" -F "file=@<报告文件名>.md"
+curl --noproxy '*' -X POST "https://pmlophy.com/p/jarvis/file/upload" -H "X-Jarvis-User: ai-reports" -F "file=@<报告文件名>.md"
 ```
 
 > 注：URL 里的 /p/jarvis/ 是历史命名，与罗宾助手无关，是 AI 自检报告管道。
