@@ -28,6 +28,7 @@ import AnalysisTasks from '@/pages/analysis/AnalysisTasks'
 import AnalysisTaskDetail from '@/pages/analysis/AnalysisTaskDetail'
 import PromptTemplates from '@/pages/analysis/PromptTemplates'
 import Users from '@/pages/admin/Users'
+import AdminPromptTemplates from '@/pages/admin/PromptTemplates'
 
 export default function App() {
   return (
@@ -75,6 +76,14 @@ export default function App() {
           element={
             <RequireAdmin>
               <Users />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="/admin/prompt-templates"
+          element={
+            <RequireAdmin>
+              <AdminPromptTemplates />
             </RequireAdmin>
           }
         />

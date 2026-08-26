@@ -73,6 +73,7 @@ def _register_routers() -> None:
         phase2,
     ):
         app.include_router(module.router)
+    app.include_router(prompts.v1_router)
 
 
 _register_routers()

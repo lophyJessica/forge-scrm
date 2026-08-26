@@ -107,7 +107,10 @@ const ADMIN_GROUP: MenuGroupDefinition = {
   icon: <TeamOutlined />,
   label: '权限管理',
   parentPath: '/admin/users',
-  children: [{ key: '/admin/users', label: '成员与权限' }],
+  children: [
+    { key: '/admin/users', label: '成员与权限' },
+    { key: '/admin/prompt-templates', label: '提示词模板' },
+  ],
 }
 
 const ALL_NAV_GROUPS = [...NAV_GROUPS, ADMIN_GROUP]

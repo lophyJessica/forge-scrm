@@ -14,8 +14,11 @@ from app.core.exceptions import BizError, not_found
 from app.models.prompt import PromptTemplate
 from app.schemas.common import OkResult, PageResult
 from app.schemas.prompt import PromptTemplateCreate, PromptTemplateOut, PromptTemplateUpdate
+from app.services.script_service import DEFAULT_SYSTEM_PROMPT as DEFAULT_SCRIPT_SYSTEM_PROMPT
+from app.services.topic_service import DEFAULT_SYSTEM_PROMPT as DEFAULT_TOPIC_SYSTEM_PROMPT
 
 router = APIRouter(prefix="/api/prompt-templates", tags=["提示词模板"])
+v1_router = APIRouter(prefix="/api/v1/prompt-templates", tags=["提示词模板"])
 
 
 @router.get("", response_model=PageResult[PromptTemplateOut], summary="提示词模板列表")
@@ -46,6 +49,17 @@ def list_templates(
         page_size=page_size,
         items=[PromptTemplateOut.model_validate(r) for r in rows],
     )
+
+
+@router.get("/builtin", response_model=list[dict[str, str]], summary="内置默认提示词（只读）")
+@v1_router.get("/builtin", response_model=list[dict[str, str]], summary="内置默认提示词（只读）")
+def list_builtin_templates(_: CurrentUser) -> list[dict[str, str]]:
+    """返回代码内置提示词；不落库、不允许编辑。"""
+
+    return [
+        {"task_type": PromptTaskType.选题生成.value, "content": DEFAULT_TOPIC_SYSTEM_PROMPT},
+        {"task_type": PromptTaskType.脚本生成.value, "content": DEFAULT_SCRIPT_SYSTEM_PROMPT},
+    ]
 
 
 @router.post("", response_model=PromptTemplateOut, summary="新建提示词模板")
