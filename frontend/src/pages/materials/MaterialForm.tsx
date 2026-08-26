@@ -23,7 +23,6 @@ export default function MaterialForm() {
       void http.get<MaterialOut>(`/materials/${id}`).then(({ data }) => {
         form.setFieldsValue({
           ...data,
-          valid_range: [dayjs(data.valid_from), dayjs(data.valid_until)],
         })
       })
     }
@@ -31,7 +30,6 @@ export default function MaterialForm() {
 
   const submit = async (submitForReview: boolean) => {
     const values = await form.validateFields()
-    const [from, to] = values.valid_range
     const payload = {
       title: values.title,
       content: values.content,
@@ -39,8 +37,6 @@ export default function MaterialForm() {
       source_type: values.source_type,
       source_url: values.source_url || null,
       trust_level: values.trust_level,
-      valid_from: from.format('YYYY-MM-DD'),
-      valid_until: to.format('YYYY-MM-DD'),
       tags: values.tags || [],
     }
     setSaving(true)
@@ -76,9 +72,6 @@ export default function MaterialForm() {
           </Form.Item>
           <Form.Item name="trust_level" label="可信度" rules={[{ required: true }]} style={{ width: 120 }}>
             <Select options={options('trust_level')} />
-          </Form.Item>
-          <Form.Item name="valid_range" label="有效期" rules={[{ required: true }]}>
-            <DatePicker.RangePicker />
           </Form.Item>
         </Space>
         <Form.Item name="source_url" label="来源链接">
