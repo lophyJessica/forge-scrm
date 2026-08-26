@@ -488,6 +488,20 @@ def retry_research_task(task_id: int, _: CurrentUser, db: DbSession) -> Research
 # ==================== 研究助手：报告 / 引用 ====================
 
 @router.get(
+    "/research-tasks/{task_id}/report",
+    response_model=ResearchReportOut,
+    summary="按研究任务查报告（前端主路径）",
+)
+def get_research_report_by_task(task_id: int, _: CurrentUser, db: DbSession) -> ResearchReportOut:
+    report = db.scalar(
+        select(ResearchReport).where(ResearchReport.research_task_id == task_id)
+    )
+    if not report:
+        raise not_found("研究报告")
+    return ResearchReportOut.model_validate(report)
+
+
+@router.get(
     "/research-reports/{report_id}",
     response_model=ResearchReportOut,
     summary="研究报告详情（骨架）",
