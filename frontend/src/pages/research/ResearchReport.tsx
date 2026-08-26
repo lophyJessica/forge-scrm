@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { isAxiosError } from 'axios'
-import { useParams } from 'react-router-dom'
-import { Alert, Card, Descriptions, Divider, List, Skeleton, Space, Tag, Typography } from 'antd'
+import { useNavigate, useParams } from 'react-router-dom'
+import { Alert, Button, Card, Descriptions, Divider, List, Skeleton, Space, Tag, Typography } from 'antd'
+import { ArrowLeftOutlined } from '@ant-design/icons'
 import { http } from '@/api/client'
 import { statusTagColor } from '@/theme'
 import type { ResearchReferenceOut, ResearchReportOut } from '@/types'
@@ -21,6 +22,7 @@ async function loadReport(taskOrReportId: string) {
 
 export default function ResearchReport() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const [report, setReport] = useState<ResearchReportOut | null>(null)
   const [references, setReferences] = useState<ResearchReferenceOut[]>([])
   const [loading, setLoading] = useState(true)
@@ -50,6 +52,7 @@ export default function ResearchReport() {
     <Space direction="vertical" size={16} style={{ display: 'flex' }}>
       <Card>
         <Space align="center">
+          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/research/tasks')}>返回列表</Button>
           <Typography.Title level={3} style={{ margin: 0 }}>{report.title}</Typography.Title>
           {report.is_ai_product && <Tag color="purple">AI 生成</Tag>}
           <Tag color={statusTagColor(report.status === 'success' ? '已完成' : '失败')}>{report.status}</Tag>

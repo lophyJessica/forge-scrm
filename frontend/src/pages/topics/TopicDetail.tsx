@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button, Card, Descriptions, Modal, Space, Tag, Typography, message } from 'antd'
+import { ArrowLeftOutlined } from '@ant-design/icons'
 import { http } from '@/api/client'
 import { useAuthStore } from '@/store/auth'
 import { PERM } from '@/store/meta'
@@ -41,6 +42,7 @@ export default function TopicDetail() {
       title={`选题 #${topic.id}`}
       extra={
         <Space>
+          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/topics')}>返回列表</Button>
           {topic.has_ai_raw_response && <Button onClick={showRaw}>查看 AI 原始响应</Button>}
           {can(PERM.选题修改) && (
             <Button onClick={() => navigate(`/topics/${topic.id}/edit`)}>修改</Button>

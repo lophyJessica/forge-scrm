@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button, Card, Descriptions, Space, Tag, message } from 'antd'
+import { ArrowLeftOutlined } from '@ant-design/icons'
 import { http } from '@/api/client'
 import { useAuthStore } from '@/store/auth'
 import { PERM } from '@/store/meta'
@@ -36,6 +37,7 @@ export default function ScriptDetail() {
       title={`脚本 #${script.id} · v${script.current_version}`}
       extra={
         <Space wrap>
+          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/scripts')}>返回列表</Button>
           {can(PERM.脚本版本查看) && (
             <Button onClick={() => navigate(`/scripts/${script.id}/versions`)}>版本历史</Button>
           )}
