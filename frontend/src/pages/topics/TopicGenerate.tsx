@@ -386,6 +386,20 @@ export default function TopicGenerate() {
                   optionRender={(option) => (
                     <div style={{ whiteSpace: 'normal', lineHeight: 1.5 }}>{option.data.label}</div>
                   )}
+                  labelRender={(props) => (
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        maxWidth: '100%',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        verticalAlign: 'middle',
+                      }}
+                    >
+                      {props.label}
+                    </span>
+                  )}
                 />
               </Tooltip>
             </Form.Item>
