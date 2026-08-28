@@ -299,6 +299,7 @@ export default function ReportDetail() {
         open={createPushOpen}
         title="创建推送任务"
         width={520}
+        zIndex={1100}
         onCancel={() => setCreatePushOpen(false)}
         onOk={createPush}
         okButtonProps={{ disabled: !pushConfig?.configured }}
