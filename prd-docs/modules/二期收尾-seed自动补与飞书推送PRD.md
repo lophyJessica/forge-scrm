@@ -31,18 +31,19 @@
 
 数据报告模块推送骨架已就绪（ReportPushTask/ReportPushRecord 表、创建/执行接口、状态机：待推送→推送中→已推送/失败+retry_count），执行接口的发送段为 501 TODO。本期只接飞书，微信暂缓。
 
-### 方案：企业自建应用 + im/v1/messages
+### 方案：企业自建应用 + im/v1/messages（open_id 直发，已实测通）
 
 - 凭据经环境变量注入（禁止写死在代码/配置文件里）：
-  - FEISHU_APP_ID（必需）
-  - FEISHU_APP_SECRET（必需）
-  - FEISHU_PUSH_USER_ID（必需，接收人 user_id，支持逗号分隔多个）
+  - FEISHU_APP_ID（必需）= cli_aa1b8f3794b91cc6
+  - FEISHU_APP_SECRET（必需，用户部署时自行配置）
+  - FEISHU_PUSH_OPEN_IDS（必需，接收人 open_id，逗号分隔多个；已实测第一个：ou_234ed4a687adfc3fe5c1ba283ba39d44）
+- 为什么用 open_id：接收人是个人飞书账号（未加入企业组织），没有 user_id；open_id 通过「通过手机号或邮箱获取用户 ID」接口（batch_get_id，需 contact:user.id:readonly 权限）换取
 - 发送流程（backend/app/services/feishu_push.py）：
-  1. 取 tenant_access_token：POST /open-apis/auth/v3/tenant_access_token/internal（app_id+app_secret），token 缓存至过期前 5 分钟刷新
-  2. 发消息：POST /open-apis/im/v1/messages?receive_id_type=user_id，Authorization: Bearer <token>，body 为 interactive 卡片（report 用户的 user_id 已实测可换取 token，im:message 权限已开通）
-  3. 卡片内容：报告标题、生成时间、核心数据摘要（以报告实体现有字段为准，超长截断 800 字）
+  1. 取 tenant_access_token：POST /open-apis/auth/v3/tenant_access_token/internal（app_id+app_secret），token 缓存至过期前 5 分钟刷新【已实测 code=0】
+  2. 发消息：POST /open-apis/im/v1/messages?receive_id_type=open_id，Authorization: Bearer <token>，body 为 interactive 卡片（报告标题、生成时间、核心数据摘要，超长截断 800 字）【已实测发送成功 code=0】
 - 失败处理：非 200 或飞书返回非 0 code → 推送记录标记失败+错误摘要，任务置失败（复用现有 retry_count 手动重试逻辑）；token 失效（code 99991663/99991661）自动刷新重试一次
 - 记录留痕：ReportPushRecord 存响应摘要（不含 Authorization 头、不含 secret）
+- 依赖权限（已开通）：im:message（发消息）、contact:user.id:readonly（手机号换 open_id，运维侧换新接收人 ID 时用，运行时不依赖）
 
 ### 验收
 

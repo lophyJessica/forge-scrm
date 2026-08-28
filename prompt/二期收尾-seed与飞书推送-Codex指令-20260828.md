@@ -18,12 +18,12 @@ Request:
 2. 任务二 飞书推送（backend/app/routers/reports.py + 新建 backend/app/services/feishu_push.py）：
    - feishu_push.py 核心：
      a) get_tenant_token()：POST https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal（app_id+app_secret from settings），进程内缓存 token 至过期前 5 分钟（响应有 expire 字段，秒）。
-     b) send_report_card(user_id, title, generated_at, digest)：POST https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=user_id，body={"receive_id": user_id, "msg_type": "interactive", "content": "<卡片JSON字符串>"}；卡片含报告标题/生成时间/摘要（digest 截断 800 字）；HTTP 超时 10s。返回 (ok: bool, resp_summary: str)。
+     b) send_report_card(open_id, title, generated_at, digest)：POST https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=open_id，body={"receive_id": open_id, "msg_type": "interactive", "content": "<卡片JSON字符串>"}；卡片含报告标题/生成时间/摘要（digest 截断 800 字）；HTTP 超时 10s。返回 (ok: bool, resp_summary: str)。【此链路已用真实凭据实测通：token 获取 code=0、卡片发送 code=0】
      c) 飞书 code 99991663/99991661（token 失效）→ 强制刷新 token 重试一次。
-   - config.py 新增字段：feishu_app_id/feishu_app_secret/feishu_push_user_ids（均默认空字符串，从环境变量 FEISHU_APP_ID/FEISHU_APP_SECRET/FEISHU_PUSH_USER_IDS 读取；user_ids 支持逗号分隔多个接收人）。
-   - execute_push_task 替换 501 段：任一必需配置缺失 → BizError("未配置飞书推送，请联系管理员设置 FEISHU_APP_ID/FEISHU_APP_SECRET/FEISHU_PUSH_USER_IDS")，任务状态回滚为待推送不留脏状态；逐个接收人发送，全部成功 → 任务置已推送；任一失败 → 任务置失败，记录存"接收人+失败原因摘要"；retry_count 逻辑保持现有行为（手动重试）。
-   - 安全红线：secret/token 绝不写入数据库记录、日志、异常信息；ReportPushRecord 只存"接收人(user_id)+成功/失败+飞书code与msg摘要"。
-3. 禁止扩界：不做定时任务/APScheduler、不做微信推送、不做前端改动（推送交互已有）、不动 context/ 与 prd-docs/、不改数据库模型结构（无需新表新列）、不做 open_id/通讯录功能。
+   - config.py 新增字段：feishu_app_id/feishu_app_secret/feishu_push_open_ids（均默认空字符串，从环境变量 FEISHU_APP_ID/FEISHU_APP_SECRET/FEISHU_PUSH_OPEN_IDS 读取；open_ids 支持逗号分隔多个接收人）。
+   - execute_push_task 替换 501 段：任一必需配置缺失 → BizError("未配置飞书推送，请联系管理员设置 FEISHU_APP_ID/FEISHU_APP_SECRET/FEISHU_PUSH_OPEN_IDS")，任务状态回滚为待推送不留脏状态；逐个接收人发送，全部成功 → 任务置已推送；任一失败 → 任务置失败，记录存"接收人+失败原因摘要"；retry_count 逻辑保持现有行为（手动重试）。
+   - 安全红线：secret/token 绝不写入数据库记录、日志、异常信息；ReportPushRecord 只存"接收人(open_id)+成功/失败+飞书code与msg摘要"。
+3. 禁止扩界：不做定时任务/APScheduler、不做微信推送、不做前端改动（推送交互已有）、不动 context/ 与 prd-docs/、不改数据库模型结构（无需新表新列）、不做 user_id/通讯录查询功能（open_id 由运维侧用调试台换取后配进环境变量）。
 
 Output format:
 - 最小改动。后端完成后跑 python compileall 验证。
