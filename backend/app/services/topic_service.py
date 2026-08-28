@@ -108,10 +108,13 @@ def build_material_block(db: Session, material_ids: list[int]) -> tuple[str, lis
     """组装参考资料上下文；仅允许引用「已生效」资料（R1：审核后才能使用）。"""
     if not material_ids:
         return "本次不提供参考资料，请基于通用商业常识生成。", []
-    rows = list(db.scalars(select(Material).where(Material.id.in_(material_ids))).all())
-    missing = set(material_ids) - {r.id for r in rows}
+    ordered_ids = list(dict.fromkeys(material_ids))
+    found = list(db.scalars(select(Material).where(Material.id.in_(ordered_ids))).all())
+    rows_by_id = {row.id: row for row in found}
+    missing = set(ordered_ids) - rows_by_id.keys()
     if missing:
         raise BizError(f"参考资料不存在：{sorted(missing)}")
+    rows = [rows_by_id[material_id] for material_id in ordered_ids]
     invalid = [r.title for r in rows if r.status != MaterialStatus.已生效]
     if invalid:
         raise BizError(f"参考资料必须为「已生效」状态（R1），以下资料不可引用：{'、'.join(invalid)}")
@@ -130,8 +133,8 @@ def build_prompt(
     template_id: int | None,
     prompt_content: str | None = None,
 ) -> tuple[str, str, dict | None, list[Material]]:
-    material_block, materials = build_material_block(db, material_ids)
     custom_prompt = (prompt_content or "").strip()
+    template: PromptTemplate | None = None
     if custom_prompt:
         system_prompt = custom_prompt
         snapshot: dict | None = {"prompt_type": "custom", "content": custom_prompt}
@@ -157,6 +160,16 @@ def build_prompt(
                 "version": 0,
                 "content_snapshot": DEFAULT_SYSTEM_PROMPT,
             }
+
+    effective_material_ids = list(material_ids)
+    if template is not None and template.material_combo:
+        effective_material_ids = list(dict.fromkeys([*template.material_combo, *material_ids]))
+    material_block, materials = build_material_block(db, effective_material_ids)
+    if template is not None and materials:
+        snapshot["material_combo_snapshot"] = [
+            {"id": material.id, "title": material.title, "content": material.content}
+            for material in materials
+        ]
 
     user_prompt = DEFAULT_USER_PROMPT_TEMPLATE.format(
         direction=direction,

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Alert, Button, Card, Form, Input, Modal, Popconfirm, Select, Table, Tag, message } from 'antd'
 import { http } from '@/api/client'
+import MaterialComboField from '@/components/MaterialComboField'
 import { TableActions } from '@/components/TableActions'
 import { useAuthStore } from '@/store/auth'
 import { PERM, useMetaStore } from '@/store/meta'
@@ -64,6 +65,7 @@ export default function PromptTemplates() {
       task_type: values.task_type,
       name: values.name,
       content: values.content,
+      material_combo: values.material_combo || [],
       output_schema,
       status: values.status,
     }
@@ -161,6 +163,7 @@ export default function PromptTemplates() {
           <Form.Item name="content" label="提示词正文" rules={[{ required: true }]}>
             <Input.TextArea rows={10} />
           </Form.Item>
+          <MaterialComboField />
           <Form.Item name="output_schema_text" label="输出字段定义 JSON（分析类必填）">
             <Input.TextArea rows={6} placeholder='{"results":[{"conclusion":"...","suggestions":["..."]}]}' />
           </Form.Item>

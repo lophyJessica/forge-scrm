@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tag, Typography, message } from 'antd'
 import { http } from '@/api/client'
+import MaterialComboField from '@/components/MaterialComboField'
 import { TableActions } from '@/components/TableActions'
 import { PERM } from '@/store/meta'
 import { useAuthStore } from '@/store/auth'
@@ -55,6 +56,7 @@ export default function PromptTemplates() {
       name: values.name,
       content: values.content,
       task_type: values.task_type,
+      material_combo: values.material_combo || [],
       status: '启用',
     }
     if (editing) {
@@ -169,6 +171,7 @@ export default function PromptTemplates() {
           <Form.Item name="content" label="提示词正文" rules={[{ required: true, message: '请输入提示词正文' }]}>
             <Input.TextArea rows={14} showCount />
           </Form.Item>
+          <MaterialComboField />
           <Typography.Text type="secondary">
             当前后端模板模型未提供可持久化的描述字段；版本号会在正文变更时由后端自动递增。
           </Typography.Text>
