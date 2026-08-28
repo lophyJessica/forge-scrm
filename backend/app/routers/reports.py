@@ -259,6 +259,8 @@ def delete_push_task(task_id: int, _: CurrentUser, db: DbSession) -> OkResult:
         raise not_found("推送任务")
     if task.status == ReportPushStatus.推送中:
         raise BizError("推送执行中，请稍后再试")
+    if task.status == ReportPushStatus.已推送:
+        raise BizError("已推送任务为发送凭证，不可删除")
     db.delete(task)
     db.commit()
     return OkResult(message="推送任务已删除")

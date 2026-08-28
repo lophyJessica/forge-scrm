@@ -228,7 +228,7 @@ export default function ReportDetail() {
           renderItem={(task) => {
             const error = latestPushError(task)
             const canSend = task.status === '待推送' || task.status === '失败'
-            const canDelete = task.status === '已推送' || task.status === '已取消'
+            const canDelete = canSend || task.status === '已取消'
             return (
               <List.Item
                 actions={[
