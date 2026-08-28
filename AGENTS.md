@@ -87,7 +87,7 @@ context/ > templates/ > prd-docs/ > draft/
 
 ## 前端 UI 标准
 
-> 完整规范见 `frontend/UI-DESIGN.md`（唯一维护处）。要点：视觉 token 唯一来源 `theme.ts`；间距 8px 栅格五档；行内操作禁 primary；danger 仅限不可逆操作；所有 Table 必设 emptyText。写前端/改样式前必读该文件。
+> 完整规范见根目录 `UI-DESIGN.md`（唯一维护处）。要点：视觉 token 唯一来源 `theme.ts`；间距 8px 栅格五档；行内操作禁 primary；danger 仅限不可逆操作；所有 Table 必设 emptyText。写前端/改样式前必读该文件。
 
 ## AI 自检报告（完成后必做）
 
