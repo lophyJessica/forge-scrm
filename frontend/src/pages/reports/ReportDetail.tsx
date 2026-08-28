@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Alert, Button, Card, Descriptions, Divider, Form, Input, List, Modal, Select, Skeleton, Space, Tag, Typography, message } from 'antd'
+import { Alert, Badge, Button, Card, Descriptions, Divider, Drawer, Form, Input, List, Modal, Skeleton, Space, Tag, Tooltip, Typography, message } from 'antd'
 import { http } from '@/api/client'
 import { statusTagColor } from '@/theme'
 import type { PageResult, ReportOut, ReportPushTaskOut } from '@/types'
@@ -14,6 +14,13 @@ function formatTime(value?: string | null) {
 }
 
 type SourceItem = { type?: string; id?: number; [key: string]: unknown }
+type PushConfig = { channel: 'feishu'; receivers_count: number; configured: boolean }
+
+const PUSH_CONFIG_ERROR = '未配置飞书推送，请联系管理员设置 FEISHU_APP_ID/FEISHU_APP_SECRET/FEISHU_PUSH_OPEN_IDS'
+
+function latestPushError(task: ReportPushTaskOut) {
+  return [...(task.records || [])].reverse().find((record) => record.status === '失败')?.error_message
+}
 
 export default function ReportDetail() {
   const { id } = useParams<{ id: string }>()
@@ -21,15 +28,28 @@ export default function ReportDetail() {
   const [form] = Form.useForm()
   const [report, setReport] = useState<ReportOut | null>(null)
   const [pushTasks, setPushTasks] = useState<ReportPushTaskOut[]>([])
+  const [pushConfig, setPushConfig] = useState<PushConfig | null>(null)
   const [loading, setLoading] = useState(true)
-  const [pushOpen, setPushOpen] = useState(false)
+  const [pushDrawerOpen, setPushDrawerOpen] = useState(false)
+  const [createPushOpen, setCreatePushOpen] = useState(false)
   const [pushing, setPushing] = useState<number | null>(null)
 
   const load = async (reportId: string) => {
-    const { data } = await http.get<ReportOut>(`/reports/${reportId}`)
-    setReport(data)
-    const push = await http.get<PageResult<ReportPushTaskOut>>(`/reports/${reportId}/push-tasks`, { params: { page_size: 50 } })
-    setPushTasks(push.data.items)
+    const [reportResponse, pushResponse, configResponse] = await Promise.all([
+      http.get<ReportOut>(`/reports/${reportId}`),
+      http.get<PageResult<ReportPushTaskOut>>(`/reports/${reportId}/push-tasks`, { params: { page_size: 50 } }),
+      http.get<PushConfig>('/reports/push-config'),
+    ])
+    setReport(reportResponse.data)
+    setPushTasks(pushResponse.data.items)
+    setPushConfig(configResponse.data)
+  }
+
+  const loadPushTasks = async (reportId: string) => {
+    const { data } = await http.get<PageResult<ReportPushTaskOut>>(`/reports/${reportId}/push-tasks`, {
+      params: { page_size: 50 },
+    })
+    setPushTasks(data.items)
   }
 
   useEffect(() => {
@@ -42,25 +62,42 @@ export default function ReportDetail() {
     return () => { active = false }
   }, [id])
 
+  const openCreatePush = () => {
+    form.setFieldsValue({
+      channel: '飞书',
+      recipient_type: '指定人',
+      target_object: pushConfig?.configured
+        ? `系统接收人 ×${pushConfig.receivers_count}（飞书）`
+        : '未配置，请联系管理员',
+    })
+    setCreatePushOpen(true)
+  }
+
   const createPush = async () => {
     if (!id) return
     const values = await form.validateFields()
     await http.post(`/reports/${id}/push-tasks`, values)
-    message.success('推送任务已创建（发送渠道待实测）')
-    setPushOpen(false)
-    await load(id)
+    message.success('推送任务已创建，可点发送推给接收人')
+    setCreatePushOpen(false)
+    setPushDrawerOpen(true)
+    await loadPushTasks(id)
   }
 
   const executePush = async (taskId: number) => {
     if (!id) return
     setPushing(taskId)
     try {
-      await http.post(`/push-tasks/${taskId}/execute`)
+      const { data } = await http.post<ReportPushTaskOut>(`/push-tasks/${taskId}/execute`)
+      if (data.status === '已推送') {
+        message.success('推送成功，接收人已在飞书收到卡片')
+      } else {
+        message.error(latestPushError(data) || '推送失败，请稍后重试')
+      }
     } catch {
-      // 501 由全局拦截器提示；刷新列表看失败记录
+      // 全局请求拦截器展示后端错误。
     } finally {
       setPushing(null)
-      await load(id)
+      await loadPushTasks(id)
     }
   }
 
@@ -70,6 +107,7 @@ export default function ReportDetail() {
   const snapshot = report.source_snapshot || {}
   const sources = Array.isArray(snapshot.sources) ? snapshot.sources as SourceItem[] : []
   const gaps = Array.isArray(snapshot.gaps) ? snapshot.gaps as string[] : []
+  const pendingPushCount = pushTasks.filter((task) => task.status === '待推送' || task.status === '失败').length
 
   return (
     <Space direction="vertical" size={16} style={{ display: 'flex' }}>
@@ -77,8 +115,13 @@ export default function ReportDetail() {
         extra={(
           <Space>
             <Button onClick={() => navigate('/reports')}>返回列表</Button>
+            <Badge count={pendingPushCount} showZero size="small">
+              <Button onClick={() => setPushDrawerOpen(true)}>推送任务（{pushTasks.length}）</Button>
+            </Badge>
             {report.generation_status === '已完成' && (
-              <Button type="primary" onClick={() => { form.resetFields(); setPushOpen(true) }}>创建推送</Button>
+              <Tooltip title={pushConfig?.configured ? undefined : PUSH_CONFIG_ERROR}>
+                <Button type="primary" onClick={openCreatePush}>创建推送</Button>
+              </Tooltip>
             )}
           </Space>
         )}
@@ -132,44 +175,74 @@ export default function ReportDetail() {
         />
       </Card>
 
-      <Card title="推送任务">
+      <Drawer
+        open={pushDrawerOpen}
+        width={480}
+        title="推送任务"
+        onClose={() => setPushDrawerOpen(false)}
+        extra={report.generation_status === '已完成' ? (
+          <Tooltip title={pushConfig?.configured ? undefined : PUSH_CONFIG_ERROR}>
+            <Button type="primary" size="small" onClick={openCreatePush}>创建推送</Button>
+          </Tooltip>
+        ) : null}
+      >
         <List
           dataSource={pushTasks}
-          locale={{ emptyText: '暂无推送任务。已完成报告可创建飞书/微信推送，发送能力待实测。' }}
-          renderItem={(task) => (
-            <List.Item
-              actions={[
-                task.status !== '已推送' ? (
-                  <Button key="send" size="small" loading={pushing === task.id} onClick={() => executePush(task.id)}>发送</Button>
-                ) : null,
-              ]}
-            >
-              <List.Item.Meta
-                title={`${task.task_no} · ${task.channel} / ${task.target_object}`}
-                description={(
-                  <Space wrap>
-                    <Tag color={statusTagColor(task.status)}>{task.status}</Tag>
-                    <Typography.Text type="secondary">重试 {task.retry_count}</Typography.Text>
-                    {task.records?.[0]?.error_message && <Typography.Text type="danger">{task.records[0].error_message}</Typography.Text>}
-                  </Space>
-                )}
-              />
-            </List.Item>
-          )}
+          locale={{ emptyText: '暂无推送任务。已完成报告可创建飞书推送，创建后点发送即推送给接收人。' }}
+          renderItem={(task) => {
+            const error = latestPushError(task)
+            return (
+              <List.Item
+                actions={[
+                  task.status !== '已推送' ? (
+                    <Button
+                      key="send"
+                      size="small"
+                      disabled={task.status === '推送中'}
+                      loading={pushing === task.id}
+                      onClick={() => executePush(task.id)}
+                    >
+                      发送
+                    </Button>
+                  ) : null,
+                ]}
+              >
+                <List.Item.Meta
+                  title={`${task.task_no} · ${task.channel} / ${task.target_object}`}
+                  description={(
+                    <Space wrap>
+                      <Tag color={statusTagColor(task.status)}>{task.status}</Tag>
+                      <Typography.Text type="secondary">重试 {task.retry_count}</Typography.Text>
+                      {error && <Typography.Text type="danger">{error}</Typography.Text>}
+                    </Space>
+                  )}
+                />
+              </List.Item>
+            )
+          }}
         />
-      </Card>
+      </Drawer>
 
-      <Modal open={pushOpen} title="创建推送任务" width={520} onCancel={() => setPushOpen(false)} onOk={createPush} okText="创建" cancelText="取消">
-        <Alert type="info" showIcon style={{ marginBottom: 12 }} message="渠道 API 待实测，创建后发送将返回暂不可用。" />
+      <Modal
+        open={createPushOpen}
+        title="创建推送任务"
+        width={520}
+        onCancel={() => setCreatePushOpen(false)}
+        onOk={createPush}
+        okButtonProps={{ disabled: !pushConfig?.configured }}
+        okText="创建"
+        cancelText="取消"
+      >
+        <Alert type="info" showIcon style={{ marginBottom: 12 }} message="推送将通过飞书应用发送给系统配置的接收人。" />
         <Form form={form} layout="vertical" initialValues={{ channel: '飞书', recipient_type: '指定人' }}>
           <Form.Item name="channel" label="渠道" rules={[{ required: true }]}>
-            <Select options={[{ label: '飞书', value: '飞书' }, { label: '微信', value: '微信' }]} />
+            <Input readOnly />
           </Form.Item>
           <Form.Item name="recipient_type" label="目标类型" rules={[{ required: true }]}>
-            <Select options={[{ label: '指定人', value: '指定人' }, { label: '群', value: '群' }]} />
+            <Input readOnly />
           </Form.Item>
-          <Form.Item name="target_object" label="目标人或群" rules={[{ required: true, message: '请填写目标标识' }]}>
-            <Input maxLength={255} placeholder="不保存凭据，仅记录用户指定的目标标识" />
+          <Form.Item name="target_object" label="目标人或群" rules={[{ required: true }]}>
+            <Input readOnly />
           </Form.Item>
         </Form>
       </Modal>

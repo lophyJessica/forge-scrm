@@ -172,9 +172,6 @@ export default function PromptTemplates() {
             <Input.TextArea rows={14} showCount />
           </Form.Item>
           <MaterialComboField />
-          <Typography.Text type="secondary">
-            当前后端模板模型未提供可持久化的描述字段；版本号会在正文变更时由后端自动递增。
-          </Typography.Text>
         </Form>
       </Modal>
     </Space>

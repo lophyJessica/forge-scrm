@@ -119,6 +119,16 @@ def create_report(payload: ReportCreate, current_user: CurrentUser, db: DbSessio
     return ReportOut.model_validate(row)
 
 
+@router.get("/reports/push-config", summary="查询飞书推送配置状态")
+def get_push_config(_: CurrentUser) -> dict[str, str | int | bool]:
+    open_ids = [item.strip() for item in settings.feishu_push_open_ids.split(",") if item.strip()]
+    return {
+        "channel": "feishu",
+        "receivers_count": len(open_ids),
+        "configured": bool(settings.feishu_app_id and settings.feishu_app_secret and open_ids),
+    }
+
+
 @router.get("/reports/{report_id}", response_model=ReportOut, summary="报告详情")
 def get_report(report_id: int, _: CurrentUser, db: DbSession) -> ReportOut:
     row = db.get(Report, report_id)
