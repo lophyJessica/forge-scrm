@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Alert, Button, Card, Checkbox, Form, Input, Modal, Select, Space, Switch, Table, Tag, message } from 'antd'
 import { http } from '@/api/client'
+import { TABLE_EMPTY } from '@/components/tableEmpty'
 import { TableActions } from '@/components/TableActions'
 import { useMetaStore } from '@/store/meta'
 import { TABLE_PAGINATION, statusTagColor } from '@/theme'
@@ -108,6 +109,7 @@ export default function Users() {
         message="管理员默认拥有全部功能权限；成员按下方勾选显式授权，未勾选即为拒绝。一期不设成员数量上限。"
       />
       <Table<UserOut>
+        locale={TABLE_EMPTY}
         rowKey="id"
         loading={loading}
         dataSource={rows}
@@ -198,7 +200,7 @@ export default function Users() {
           <Form.Item name="functional_permissions" label="功能权限（管理员恒为全部，无需勾选）">
             <Checkbox.Group
               options={permissions.map((p) => ({ label: p.label, value: p.code }))}
-              style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}
+              style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}
             />
           </Form.Item>
           <Form.Item name="scope_type" label="数据范围" rules={[{ required: true }]}>

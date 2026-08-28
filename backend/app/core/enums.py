@@ -240,6 +240,7 @@ class Permission(StrEnum):
     分析结果审核 = "analysis.result.review"
     回写反哺 = "analysis.writeback"
     提示词配置 = "prompt.config"
+    报告推送 = "report.push"
 
 
 ALL_PERMISSIONS: list[str] = [p.value for p in Permission]

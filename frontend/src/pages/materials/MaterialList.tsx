@@ -15,6 +15,7 @@ import {
   message,
 } from 'antd'
 import { http } from '@/api/client'
+import { TABLE_EMPTY } from '@/components/tableEmpty'
 import { TableActions } from '@/components/TableActions'
 import { useAuthStore } from '@/store/auth'
 import { PERM, useMetaStore } from '@/store/meta'
@@ -121,6 +122,7 @@ export default function MaterialList() {
       </Form>
 
       <Table<MaterialOut>
+        locale={TABLE_EMPTY}
         rowKey="id"
         loading={loading}
         dataSource={rows}

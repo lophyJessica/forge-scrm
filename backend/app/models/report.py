@@ -55,13 +55,21 @@ class ReportPushRecipientType(StrEnum):
 
 
 class ReportPushStatus(StrEnum):
-    """推送任务/记录状态；新增建议，待确认。"""
+    """推送任务状态；新增建议，待确认。"""
 
     待推送 = "待推送"
     推送中 = "推送中"
     已推送 = "已推送"
     失败 = "失败"
     已取消 = "已取消"
+
+
+class ReportPushRecordStatus(StrEnum):
+    """推送记录只保存实际发送结果。"""
+
+    已推送 = "已推送"
+    失败 = "失败"
+    待推送 = "待推送"
 
 
 def _updated_at_column():
@@ -244,11 +252,11 @@ class ReportPushRecord(Base):
     sent_at: Mapped[datetime | None] = mapped_column(
         DateTime, nullable=True, comment="实际发送时间；必须保留，新增字段建议，待确认"
     )
-    status: Mapped[ReportPushStatus] = mapped_column(
-        enum_type(ReportPushStatus, "report_push_record_status"),
+    status: Mapped[ReportPushRecordStatus] = mapped_column(
+        enum_type(ReportPushRecordStatus, "report_push_record_status"),
         nullable=False,
-        default=ReportPushStatus.待推送,
-        comment="待推送/推送中/已推送/失败/已取消；新增建议，待确认",
+        default=ReportPushRecordStatus.待推送,
+        comment="已推送/失败/待推送；新增建议，待确认",
     )
     provider_message_id: Mapped[str | None] = mapped_column(
         String(255), nullable=True, comment="渠道返回消息 ID；新增建议，待确认"

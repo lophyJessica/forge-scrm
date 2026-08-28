@@ -85,6 +85,10 @@ context/ > templates/ > prd-docs/ > draft/
 5. **git 纪律**：在 main 分支开发；禁止直接 push master；commit 信息详细；**禁止 commit/push 未确认的改动**（除非用户明确要求）
 6. **产物自检**：改完代码/文档，必须生成自检报告（见下）
 
+## 前端 UI 标准
+
+> 完整规范见 `frontend/UI-DESIGN.md`（唯一维护处）。要点：视觉 token 唯一来源 `theme.ts`；间距 8px 栅格五档；行内操作禁 primary；danger 仅限不可逆操作；所有 Table 必设 emptyText。写前端/改样式前必读该文件。
+
 ## AI 自检报告（完成后必做）
 
 每条指令执行完，生成自检报告 markdown，内容：任务/项目、改动文件清单、每个文件改了什么、自检结果、遗留风险。

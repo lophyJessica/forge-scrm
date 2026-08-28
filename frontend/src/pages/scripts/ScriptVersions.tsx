@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button, Card, Modal, Popconfirm, Select, Space, Table, message } from 'antd'
 import { http } from '@/api/client'
+import { TABLE_EMPTY } from '@/components/tableEmpty'
 import { useAuthStore } from '@/store/auth'
 import { PERM } from '@/store/meta'
 import type { ScriptDiffOut, ScriptVersionOut } from '@/types'
@@ -67,6 +68,7 @@ export default function ScriptVersions() {
       </Space>
 
       <Table<ScriptVersionOut>
+        locale={TABLE_EMPTY}
         rowKey="id"
         loading={loading}
         dataSource={rows}

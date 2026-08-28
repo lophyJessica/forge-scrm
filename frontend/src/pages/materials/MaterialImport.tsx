@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Alert, Button, Card, Space, Table, Typography, Upload, message } from 'antd'
 import { DownloadOutlined, UploadOutlined } from '@ant-design/icons'
 import { download, http } from '@/api/client'
+import { TABLE_EMPTY } from '@/components/tableEmpty'
 import type { ImportResult } from '@/types'
 
 export default function MaterialImport() {
@@ -56,6 +57,7 @@ export default function MaterialImport() {
           </Typography.Paragraph>
           {result.failed > 0 && (
             <Table
+              locale={TABLE_EMPTY}
               rowKey="row"
               size="small"
               dataSource={result.errors}

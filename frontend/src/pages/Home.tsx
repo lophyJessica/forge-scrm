@@ -10,7 +10,7 @@ import {
   PlusCircleOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
-import { Button, Card, Col, List, Row, Space, Statistic, Tag, Typography } from 'antd'
+import { Badge, Button, Card, Col, List, Row, Space, Statistic, Tag, Typography } from 'antd'
 import dayjs from 'dayjs'
 import { http } from '@/api/client'
 import { useAuthStore } from '@/store/auth'
@@ -263,7 +263,7 @@ export default function Home() {
               <List.Item
                 style={{ cursor: 'pointer' }}
                 onClick={() => navigate(item.path)}
-                extra={<Tag color="red">{item.count}</Tag>}
+                extra={<Badge count={item.count} />}
               >
                 {item.label}
               </List.Item>

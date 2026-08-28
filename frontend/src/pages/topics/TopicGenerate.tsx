@@ -18,6 +18,7 @@ import {
   message,
 } from 'antd'
 import { http } from '@/api/client'
+import { TABLE_EMPTY } from '@/components/tableEmpty'
 import { useMetaStore } from '@/store/meta'
 import type { MaterialOut, PageResult, TopicGenerateResult } from '@/types'
 
@@ -444,6 +445,7 @@ export default function TopicGenerate() {
             <Statistic title="入库" value={result.saved} />
           </Space>
           <Table
+            locale={TABLE_EMPTY}
             rowKey="id"
             size="small"
             dataSource={result.topics}

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button, Card, Form, Input, Modal, Select, Space, Switch, Table, Tag, message } from 'antd'
 import { http } from '@/api/client'
+import { TABLE_EMPTY } from '@/components/tableEmpty'
 import { TABLE_PAGINATION, statusTagColor } from '@/theme'
 import type { BenchmarkAccountOut, PageResult } from '@/types'
 
@@ -87,6 +88,7 @@ export default function BenchmarkAccounts() {
       </Form>
 
       <Table<BenchmarkAccountOut>
+        locale={TABLE_EMPTY}
         rowKey="id"
         loading={loading}
         dataSource={rows}

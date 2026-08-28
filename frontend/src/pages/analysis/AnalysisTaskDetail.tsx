@@ -143,7 +143,17 @@ export default function AnalysisTaskDetail() {
               <Button type="primary" onClick={() => review(true)}>
                 确认结果
               </Button>
-              <Button danger onClick={() => review(false)}>
+              <Button
+                danger
+                onClick={() => Modal.confirm({
+                  title: '确认驳回？',
+                  content: '驳回后本次分析结果将不再用于回写或反哺。',
+                  okText: '确认驳回',
+                  okType: 'danger',
+                  cancelText: '取消',
+                  onOk: () => review(false),
+                })}
+              >
                 驳回
               </Button>
             </>
@@ -197,7 +207,7 @@ export default function AnalysisTaskDetail() {
               <Descriptions.Item label="效果">{r.result_content.effect || '—'}</Descriptions.Item>
               <Descriptions.Item label="结论">{r.result_content.conclusion || '—'}</Descriptions.Item>
               <Descriptions.Item label="建议">
-                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                <ul style={{ margin: 0, paddingLeft: 16 }}>
                   {(r.result_content.suggestions || []).map((s, i) => (
                     <li key={i}>{s}</li>
                   ))}

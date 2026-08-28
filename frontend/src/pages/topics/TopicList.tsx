@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Card, Form, Input, Select, Space, Table, Tag, Tooltip, message } from 'antd'
 import { http } from '@/api/client'
+import { TABLE_EMPTY } from '@/components/tableEmpty'
 import { TableActions } from '@/components/TableActions'
 import { useMetaStore } from '@/store/meta'
 import { TABLE_PAGINATION, statusTagColor } from '@/theme'
@@ -95,6 +96,7 @@ export default function TopicList() {
       </Form>
 
       <Table<TopicOut>
+        locale={TABLE_EMPTY}
         rowKey="id"
         loading={loading}
         dataSource={rows}

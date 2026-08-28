@@ -17,10 +17,12 @@ TOKEN_INVALID_CODES = {99991663, 99991661}
 HTTP_TIMEOUT = 10.0
 CARD_MAX_BYTES = 28 * 1024
 TRUNCATION_NOTICE = "正文超长已截断，完整内容请登录系统查看"
+COLLAPSED_PREVIEW_NOTICE = "正文已折叠展示，完整内容以系统为准"
 
 _token_lock = threading.Lock()
 _cached_token: str | None = None
 _cached_until = 0.0
+_recent_tokens: list[str] = []
 
 
 class FeishuPushError(Exception):
@@ -69,6 +71,7 @@ def get_tenant_token(*, force_refresh: bool = False) -> str:
         except (TypeError, ValueError):
             expires_in = 0
         _cached_token = token
+        _recent_tokens[:] = [token, *[item for item in _recent_tokens if item != token]][:2]
         _cached_until = now + max(0, expires_in - 300)
         return token
 
@@ -133,7 +136,8 @@ def _report_card(
         generated_text = generated_at.strftime("%Y-%m-%d %H:%M:%S")
     else:
         generated_text = str(generated_at or "—")
-    body = _to_lark_md(report_body) or "暂无正文"
+    body = (_to_lark_md(report_body) or "暂无正文")[:500].rstrip()
+    body = f"{body}\n\n{COLLAPSED_PREVIEW_NOTICE}"
 
     def build(body_text: str) -> dict[str, Any]:
         elements: list[dict[str, Any]] = [
@@ -221,7 +225,7 @@ def _json_body(response: httpx.Response) -> dict[str, Any]:
 
 def _safe_msg(body: dict[str, Any]) -> str:
     message = str(body.get("msg") or body.get("message") or "飞书请求失败")
-    for credential in (settings.feishu_app_secret, _cached_token):
+    for credential in (settings.feishu_app_secret, *_recent_tokens):
         if credential:
             message = message.replace(credential, "***REDACTED***")
     return message[:500]

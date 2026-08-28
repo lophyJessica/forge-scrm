@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Alert, Button, Card, Form, Input, InputNumber, Modal, Radio, Select, Space, Table, Tooltip, message } from 'antd'
 import { http } from '@/api/client'
+import { TABLE_EMPTY } from '@/components/tableEmpty'
 import { useMetaStore } from '@/store/meta'
 import type { MaterialOut, PageResult, ScriptOut, TopicOut } from '@/types'
 
@@ -193,6 +194,7 @@ export default function ScriptGenerate() {
       {result && (
         <Card title={`生成结果（${result.generated} 版）`}>
           <Table
+            locale={TABLE_EMPTY}
             rowKey="id"
             size="small"
             pagination={false}

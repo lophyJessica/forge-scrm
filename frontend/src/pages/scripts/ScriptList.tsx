@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Card, Form, Input, Select, Space, Table, Tag, Tooltip, Typography, message } from 'antd'
 import { http } from '@/api/client'
+import { TABLE_EMPTY } from '@/components/tableEmpty'
 import { TableActions } from '@/components/TableActions'
 import { useMetaStore } from '@/store/meta'
 import { TABLE_PAGINATION, statusTagColor } from '@/theme'
@@ -92,6 +93,7 @@ export default function ScriptList() {
       </Form>
 
       <Table<ScriptOut>
+        locale={TABLE_EMPTY}
         rowKey="id"
         loading={loading}
         dataSource={rows}
@@ -141,12 +143,12 @@ export default function ScriptList() {
                     版本
                   </Button>,
                   r.status === '草稿' ? (
-                    <Button key="s" size="small" type="primary" onClick={() => act(r.id, 'submit', '已提交审核')}>
+                    <Button key="s" size="small" type="link" onClick={() => act(r.id, 'submit', '已提交审核')}>
                       提交审核
                     </Button>
                   ) : null,
                   r.status === '已通过' ? (
-                    <Button key="u" size="small" type="primary" onClick={() => act(r.id, 'mark-used', '已标记为已使用')}>
+                    <Button key="u" size="small" type="link" onClick={() => act(r.id, 'mark-used', '已标记为已使用')}>
                       标记已使用
                     </Button>
                   ) : null,

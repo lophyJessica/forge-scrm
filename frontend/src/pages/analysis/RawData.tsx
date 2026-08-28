@@ -18,6 +18,7 @@ import {
 import { UploadOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { download, http } from '@/api/client'
+import { TABLE_EMPTY } from '@/components/tableEmpty'
 import { TableActions } from '@/components/TableActions'
 import { useAuthStore } from '@/store/auth'
 import { PERM } from '@/store/meta'
@@ -151,6 +152,7 @@ export default function RawData() {
                   </Form.Item>
                 </Form>
                 <Table<RawDataOut>
+                  locale={TABLE_EMPTY}
                   rowKey="id"
                   loading={loading}
                   dataSource={rows}
@@ -245,6 +247,7 @@ export default function RawData() {
                     </p>
                     {importResult.errors.length > 0 && (
                       <Table
+                        locale={TABLE_EMPTY}
                         rowKey={(r) => `${r.row}`}
                         size="small"
                         pagination={false}

@@ -3,6 +3,7 @@ import { isAxiosError } from 'axios'
 import { type Dayjs } from 'dayjs'
 import { Button, Card, DatePicker, Form, Input, Modal, Select, Space, Spin, Table, Tabs, Tag, Typography, message } from 'antd'
 import { http } from '@/api/client'
+import { TABLE_EMPTY } from '@/components/tableEmpty'
 import { TABLE_PAGINATION, statusTagColor } from '@/theme'
 import type { BenchmarkAccountOut, CollectionRecordOut, CollectionResultOut, CollectionTaskOut, PageResult } from '@/types'
 
@@ -61,6 +62,7 @@ function TaskDetails({ taskId }: { taskId: number }) {
           label: `采集记录（${records.length}）`,
           children: (
             <Table<CollectionRecordOut>
+              locale={TABLE_EMPTY}
               size="small"
               rowKey="id"
               dataSource={records}
@@ -83,6 +85,7 @@ function TaskDetails({ taskId }: { taskId: number }) {
           label: `采集结果（${results.length}）`,
           children: (
             <Table<CollectionResultOut>
+              locale={TABLE_EMPTY}
               size="small"
               rowKey="id"
               dataSource={results}
@@ -194,6 +197,7 @@ export default function CollectionTasks() {
       </Form>
 
       <Table<CollectionTaskOut>
+        locale={TABLE_EMPTY}
         rowKey="id"
         loading={loading}
         dataSource={rows}

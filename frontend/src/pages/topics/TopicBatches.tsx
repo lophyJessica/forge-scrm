@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Card, Table } from 'antd'
 import { http } from '@/api/client'
+import { TABLE_EMPTY } from '@/components/tableEmpty'
 import { TABLE_PAGINATION } from '@/theme'
 import type { TopicBatchOut } from '@/types'
 
@@ -21,6 +22,7 @@ export default function TopicBatches() {
   return (
     <Card title="生成批次（批次记录保留，可回溯每次生成结果）">
       <Table<TopicBatchOut>
+        locale={TABLE_EMPTY}
         rowKey="batch_no"
         loading={loading}
         dataSource={rows}

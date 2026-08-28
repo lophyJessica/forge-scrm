@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tag, Typography, message } from 'antd'
 import { http } from '@/api/client'
+import { TABLE_EMPTY } from '@/components/tableEmpty'
 import MaterialComboField from '@/components/MaterialComboField'
 import { TableActions } from '@/components/TableActions'
 import { PERM } from '@/store/meta'
@@ -88,6 +89,7 @@ export default function PromptTemplates() {
         extra={can(PERM.提示词配置) ? <Button type="primary" onClick={() => openModal()}>新建模板</Button> : null}
       >
         <Table<PromptTemplateOut>
+          locale={TABLE_EMPTY}
           rowKey="id"
           loading={loading}
           dataSource={rows}

@@ -68,19 +68,26 @@ def seed_builtin_templates(db: Session) -> None:
     created: list[str] = []
     for task_type in PromptTaskType:
         exists = db.scalar(
-            select(PromptTemplate.id).where(
+            select(PromptTemplate.id)
+            .where(
                 PromptTemplate.task_type == task_type,
+                PromptTemplate.created_by == admin.id,
                 PromptTemplate.name.like("内置%"),
             )
+            .order_by(PromptTemplate.id.asc())
         )
         if exists:
+            continue
+        content = BUILTIN_PROMPTS.get(task_type)
+        if content is None:
+            logger.warning("任务类型 %s 缺少内置提示词常量，已跳过补建", task_type.value)
             continue
         name = f"内置{task_type.value}提示词"
         db.add(
             PromptTemplate(
                 task_type=task_type,
                 name=name,
-                content=BUILTIN_PROMPTS[task_type],
+                content=content,
                 status=PromptStatus.启用,
                 version=1,
                 created_by=admin.id,

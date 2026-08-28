@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { type Dayjs } from 'dayjs'
 import { Button, Card, DatePicker, Form, Modal, Select, Space, Table, Tag, Tooltip, message } from 'antd'
 import { http } from '@/api/client'
+import { TABLE_EMPTY } from '@/components/tableEmpty'
 import { TableActions } from '@/components/TableActions'
 import { TABLE_PAGINATION, statusTagColor } from '@/theme'
 import type { PageResult, ReportGenerationStatus, ReportOut, ReportType } from '@/types'
@@ -94,6 +95,7 @@ export default function ReportList() {
       </Form>
 
       <Table<ReportOut>
+        locale={TABLE_EMPTY}
         rowKey="id"
         loading={loading}
         dataSource={rows}
@@ -124,10 +126,10 @@ export default function ReportList() {
               <TableActions
                 items={[
                   row.generation_status === '待生成' ? (
-                    <Button key="gen" size="small" type="primary" loading={running === row.id} onClick={() => run(row, 'generate')}>生成</Button>
+                    <Button key="gen" size="small" type="link" loading={running === row.id} onClick={() => run(row, 'generate')}>生成</Button>
                   ) : null,
                   row.generation_status === '失败' ? (
-                    <Button key="retry" size="small" type="primary" loading={running === row.id} onClick={() => run(row, 'retry')}>重试</Button>
+                    <Button key="retry" size="small" type="link" loading={running === row.id} onClick={() => run(row, 'retry')}>重试</Button>
                   ) : null,
                   <Button key="view" size="small" onClick={() => navigate(`/reports/${row.id}`)}>查看</Button>,
                 ]}

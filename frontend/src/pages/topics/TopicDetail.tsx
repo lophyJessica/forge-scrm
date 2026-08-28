@@ -52,7 +52,17 @@ export default function TopicDetail() {
               <Button type="primary" onClick={() => screen('选中')}>
                 选中
               </Button>
-              <Button danger onClick={() => screen('淘汰')}>
+              <Button
+                danger
+                onClick={() => Modal.confirm({
+                  title: '确认淘汰该选题？',
+                  content: '淘汰后该选题将不再进入后续脚本生成流程。',
+                  okText: '确认淘汰',
+                  okType: 'danger',
+                  cancelText: '取消',
+                  onOk: () => screen('淘汰'),
+                })}
+              >
                 淘汰
               </Button>
             </>

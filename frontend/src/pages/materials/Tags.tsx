@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button, Card, Form, Input, Space, Table, message } from 'antd'
 import { http } from '@/api/client'
+import { TABLE_EMPTY } from '@/components/tableEmpty'
 import { TABLE_PAGINATION } from '@/theme'
 import { useAuthStore } from '@/store/auth'
 import { PERM } from '@/store/meta'
@@ -46,11 +47,12 @@ export default function Tags() {
         </Form>
       )}
 
-      <Space style={{ marginBottom: 12 }}>
+      <Space style={{ marginBottom: 16 }}>
         <Input.Search placeholder="搜索标签" onSearch={(v) => load(v)} style={{ width: 260 }} allowClear />
       </Space>
 
       <Table<TagOut>
+        locale={TABLE_EMPTY}
         rowKey="id"
         dataSource={rows}
         pagination={{ ...TABLE_PAGINATION, pageSize: 20 }}

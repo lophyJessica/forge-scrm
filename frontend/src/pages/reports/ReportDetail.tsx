@@ -151,7 +151,7 @@ export default function ReportDetail() {
         extra={(
           <Space>
             <Button onClick={() => navigate('/reports')}>返回列表</Button>
-            <Badge count={pendingPushCount} showZero size="small">
+            <Badge count={pendingPushCount} size="small">
               <Button onClick={() => setPushDrawerOpen(true)}>推送任务（{pushTasks.length}）</Button>
             </Badge>
             {report.generation_status === '已完成' && (

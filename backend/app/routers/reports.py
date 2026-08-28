@@ -1,26 +1,30 @@
 """数据报告 CRUD、生成/重试与飞书推送。路由 prefix 统一 /api。"""
 
 import json
-from datetime import datetime
+import re
+from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Query
-from sqlalchemy import func, select
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy import case, delete, func, select, update
 from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
-from app.core.deps import CurrentUser, DbSession
+from app.core.deps import CurrentUser, DbSession, require_permission
+from app.core.enums import Permission
 from app.core.exceptions import BizError, not_found
 from app.models.base import utcnow
 from app.models.report import (
     Report,
     ReportGenerationStatus,
     ReportPushRecord,
+    ReportPushRecordStatus,
     ReportPushChannel,
     ReportPushStatus,
     ReportPushTask,
     ReportReviewStatus,
     ReportType,
 )
+from app.models.user import User
 from app.schemas.common import OkResult, PageResult
 from app.schemas.report import (
     ReportCreate,
@@ -37,6 +41,7 @@ FEISHU_CONFIG_ERROR = (
     "未配置飞书推送，请联系管理员设置 "
     "FEISHU_APP_ID/FEISHU_APP_SECRET/FEISHU_PUSH_OPEN_IDS"
 )
+PUSH_STALE_AFTER = timedelta(minutes=10)
 
 
 def _no(prefix: str) -> str:
@@ -54,7 +59,7 @@ def _push_out(task: ReportPushTask) -> ReportPushTaskOut:
         report_id=task.report_id,
         channel=task.channel,
         recipient_type=task.recipient_type,
-        target_object=task.target_object,
+        target_object=_mask_open_id(task.target_object),
         message_config=task.message_config,
         authorization_snapshot=task.authorization_snapshot,
         status=task.status,
@@ -62,8 +67,19 @@ def _push_out(task: ReportPushTask) -> ReportPushTaskOut:
         created_by=task.created_by,
         created_at=task.created_at,
         updated_at=task.updated_at,
-        records=[ReportPushRecordOut.model_validate(row) for row in (task.records or [])],
+        records=[_push_record_out(row) for row in (task.records or [])],
     )
+
+
+def _push_record_out(record: ReportPushRecord) -> ReportPushRecordOut:
+    out = ReportPushRecordOut.model_validate(record)
+    return out.model_copy(update={"target_object": _mask_open_id(out.target_object)})
+
+
+def _mask_open_id(value: str) -> str:
+    if value.startswith("ou_") and len(value) > 10:
+        return f"{value[:6]}****{value[-4:]}"
+    return value
 
 
 @router.get("/reports", response_model=PageResult[ReportOut], summary="报告列表")
@@ -188,8 +204,8 @@ def list_report_push_tasks(
 def create_push_task(
     report_id: int,
     payload: ReportPushTaskCreate,
-    current_user: CurrentUser,
     db: DbSession,
+    current_user: User = Depends(require_permission(Permission.报告推送)),
 ) -> ReportPushTaskOut:
     report = db.get(Report, report_id)
     if not report:
@@ -202,7 +218,7 @@ def create_push_task(
         report_id=report.id,
         channel=payload.channel,
         recipient_type=payload.recipient_type,
-        target_object=payload.target_object,
+        target_object=_mask_open_id(payload.target_object),
         message_config=payload.message_config or {
             "title": report.title,
             "report_type": report.report_type.value,
@@ -233,17 +249,31 @@ def get_push_task(task_id: int, _: CurrentUser, db: DbSession) -> ReportPushTask
     response_model=ReportPushTaskOut,
     summary="取消推送任务",
 )
-def cancel_push_task(task_id: int, _: CurrentUser, db: DbSession) -> ReportPushTaskOut:
-    task = db.scalar(
-        select(ReportPushTask).options(selectinload(ReportPushTask.records)).where(ReportPushTask.id == task_id)
-    )
+def cancel_push_task(
+    task_id: int,
+    db: DbSession,
+    _: User = Depends(require_permission(Permission.报告推送)),
+) -> ReportPushTaskOut:
+    task = _get_push_task(db, task_id)
     if not task:
         raise not_found("推送任务")
-    if task.status not in {ReportPushStatus.待推送, ReportPushStatus.失败}:
-        raise BizError("仅待推送或失败任务可取消")
-    task.status = ReportPushStatus.已取消
+    task = _reset_stale_push(db, task)
+    if task is None:
+        raise BizError("任务状态已变更，请刷新后操作", code=409)
+    result = db.execute(
+        update(ReportPushTask)
+        .where(
+            ReportPushTask.id == task_id,
+            ReportPushTask.status.in_([ReportPushStatus.待推送, ReportPushStatus.失败]),
+        )
+        .values(status=ReportPushStatus.已取消, updated_at=utcnow())
+        .execution_options(synchronize_session=False)
+    )
+    if result.rowcount != 1:
+        db.rollback()
+        raise BizError("任务状态已变更，请刷新后操作", code=409)
     db.commit()
-    return _push_out(task)
+    return _push_out(_get_push_task(db, task_id))
 
 
 @router.delete(
@@ -251,17 +281,30 @@ def cancel_push_task(task_id: int, _: CurrentUser, db: DbSession) -> ReportPushT
     response_model=OkResult,
     summary="删除推送任务",
 )
-def delete_push_task(task_id: int, _: CurrentUser, db: DbSession) -> OkResult:
-    task = db.scalar(
-        select(ReportPushTask).options(selectinload(ReportPushTask.records)).where(ReportPushTask.id == task_id)
-    )
+def delete_push_task(
+    task_id: int,
+    db: DbSession,
+    _: User = Depends(require_permission(Permission.报告推送)),
+) -> OkResult:
+    task = db.get(ReportPushTask, task_id)
     if not task:
         raise not_found("推送任务")
-    if task.status == ReportPushStatus.推送中:
-        raise BizError("推送执行中，请稍后再试")
-    if task.status == ReportPushStatus.已推送:
-        raise BizError("已推送任务为发送凭证，不可删除")
-    db.delete(task)
+    result = db.execute(
+        delete(ReportPushTask)
+        .where(
+            ReportPushTask.id == task_id,
+            ReportPushTask.status.notin_([ReportPushStatus.推送中, ReportPushStatus.已推送]),
+        )
+        .execution_options(synchronize_session=False)
+    )
+    if result.rowcount != 1:
+        db.rollback()
+        current = db.get(ReportPushTask, task_id)
+        if current and current.status == ReportPushStatus.推送中:
+            raise BizError("推送执行中，请稍后再试")
+        if current and current.status == ReportPushStatus.已推送:
+            raise BizError("已推送任务为发送凭证，不可删除")
+        raise BizError("任务状态已变更，请刷新后操作", code=409)
     db.commit()
     return OkResult(message="推送任务已删除")
 
@@ -271,77 +314,136 @@ def delete_push_task(task_id: int, _: CurrentUser, db: DbSession) -> OkResult:
     response_model=ReportPushTaskOut,
     summary="执行飞书推送",
 )
-def execute_push_task(task_id: int, _: CurrentUser, db: DbSession) -> ReportPushTaskOut:
-    task = db.scalar(
-        select(ReportPushTask).options(selectinload(ReportPushTask.records)).where(ReportPushTask.id == task_id)
-    )
+def execute_push_task(
+    task_id: int,
+    db: DbSession,
+    _: User = Depends(require_permission(Permission.报告推送)),
+) -> ReportPushTaskOut:
+    task = _get_push_task(db, task_id)
     if not task:
         raise not_found("推送任务")
-    if task.status == ReportPushStatus.已推送:
-        raise BizError("已推送任务不可重复发送", code=409)
-    if task.status == ReportPushStatus.推送中:
-        raise BizError("推送任务执行中，禁止重复触发", code=409)
-    if task.status == ReportPushStatus.已取消:
-        raise BizError("已取消任务不可发送", code=409)
+    task = _reset_stale_push(db, task)
+    if task is None:
+        raise BizError("任务状态已变更，请刷新后操作", code=409)
 
     if task.channel != ReportPushChannel.飞书:
-        task.status = ReportPushStatus.待推送
-        db.commit()
         raise BizError("当前仅支持飞书推送")
 
     open_ids = [item.strip() for item in settings.feishu_push_open_ids.split(",") if item.strip()]
     if not settings.feishu_app_id or not settings.feishu_app_secret or not open_ids:
-        task.status = ReportPushStatus.待推送
-        db.commit()
         raise BizError(FEISHU_CONFIG_ERROR)
 
-    if task.status == ReportPushStatus.失败:
-        task.retry_count = (task.retry_count or 0) + 1
+    sent_targets = {
+        _mask_open_id(record.target_object)
+        for record in task.records
+        if record.status == ReportPushRecordStatus.已推送
+    }
+    pending_open_ids = [
+        open_id for open_id in open_ids if _mask_open_id(open_id) not in sent_targets
+    ]
+    if not pending_open_ids:
+        raise BizError("所有接收人已推送成功")
 
-    task.status = ReportPushStatus.推送中
+    result = db.execute(
+        update(ReportPushTask)
+        .where(
+            ReportPushTask.id == task_id,
+            ReportPushTask.status.in_([ReportPushStatus.待推送, ReportPushStatus.失败]),
+        )
+        .values(
+            status=ReportPushStatus.推送中,
+            retry_count=case(
+                (
+                    ReportPushTask.status == ReportPushStatus.失败,
+                    ReportPushTask.retry_count + 1,
+                ),
+                else_=ReportPushTask.retry_count,
+            ),
+            updated_at=utcnow(),
+        )
+        .execution_options(synchronize_session=False)
+    )
+    if result.rowcount != 1:
+        db.rollback()
+        raise BizError("任务状态已变更，请刷新后操作", code=409)
     db.commit()
-
-    report = db.get(Report, task.report_id)
-    if report is None:
-        task.status = ReportPushStatus.失败
-        db.commit()
-        raise not_found("报告")
+    task = _get_push_task(db, task_id)
+    if task is None:
+        raise BizError("任务状态已变更，请刷新后操作", code=409)
 
     attempt_no = (task.retry_count or 0) + 1
-    message_summary = _message_summary(task)
-    config = task.message_config or {}
-    title = str(config.get("title") or report.title)
-    digest = str(config.get("summary") or report.summary or "")
-    all_succeeded = True
-    for open_id in open_ids:
-        succeeded, response_summary = feishu_push.send_report_card(
-            open_id,
-            title,
-            report.generated_at,
-            digest,
-            report.content,
-            _report_overview(report),
-        )
-        response_data = _response_data(response_summary)
-        provider_code = response_data.get("code")
-        provider_message_id = response_data.get("message_id")
+    message_summary = "报告推送"
+    current_target = task.target_object
+    try:
+        report = db.get(Report, task.report_id)
+        if report is None:
+            raise RuntimeError("关联报告不存在")
+        message_summary = _message_summary(task)
+        config = task.message_config or {}
+        title = str(config.get("title") or report.title)
+        digest = str(config.get("summary") or report.summary or "")
+        all_succeeded = True
+        for open_id in pending_open_ids:
+            current_target = _mask_open_id(open_id)
+            succeeded, response_summary = feishu_push.send_report_card(
+                open_id,
+                title,
+                report.generated_at,
+                digest,
+                report.content,
+                _report_overview(report),
+            )
+            response_data = _safe_response_data(
+                _response_data(response_summary), open_ids
+            )
+            provider_code = response_data.get("code")
+            provider_message_id = response_data.get("message_id")
+            db.add(
+                ReportPushRecord(
+                    push_task_id=task.id,
+                    channel=task.channel,
+                    target_object=_mask_open_id(open_id),
+                    recipient_type=task.recipient_type,
+                    message_summary=message_summary,
+                    sent_at=utcnow() if succeeded else None,
+                    status=(
+                        ReportPushRecordStatus.已推送
+                        if succeeded
+                        else ReportPushRecordStatus.失败
+                    ),
+                    provider_message_id=str(provider_message_id) if provider_message_id else None,
+                    error_code=None if succeeded else str(provider_code or "FEISHU_SEND_FAILED")[:64],
+                    error_message=None if succeeded else str(response_data.get("msg") or "飞书发送失败")[:2000],
+                    response_snapshot=response_data,
+                    attempt_no=attempt_no,
+                )
+            )
+            db.commit()
+            all_succeeded = all_succeeded and succeeded
+    except Exception as exc:
+        db.rollback()
+        task = db.get(ReportPushTask, task_id)
+        if task is None:
+            raise not_found("推送任务")
+        task.status = ReportPushStatus.失败
+        error_message = _safe_exception_summary(exc, open_ids)
         db.add(
             ReportPushRecord(
                 push_task_id=task.id,
                 channel=task.channel,
-                target_object=open_id,
+                target_object=current_target,
                 recipient_type=task.recipient_type,
                 message_summary=message_summary,
-                sent_at=utcnow() if succeeded else None,
-                status=ReportPushStatus.已推送 if succeeded else ReportPushStatus.失败,
-                provider_message_id=str(provider_message_id) if provider_message_id else None,
-                error_code=None if succeeded else str(provider_code or "FEISHU_SEND_FAILED")[:64],
-                error_message=None if succeeded else str(response_data.get("msg") or "飞书发送失败")[:2000],
-                response_snapshot=response_data,
+                status=ReportPushRecordStatus.失败,
+                error_code="UNEXPECTED_PUSH_ERROR",
+                error_message=error_message,
+                response_snapshot={"code": "UNEXPECTED_PUSH_ERROR", "msg": error_message},
                 attempt_no=attempt_no,
             )
         )
-        all_succeeded = all_succeeded and succeeded
+        db.commit()
+        refreshed = _get_push_task(db, task_id)
+        return _push_out(refreshed or task)
 
     task.status = ReportPushStatus.已推送 if all_succeeded else ReportPushStatus.失败
     db.commit()
@@ -352,6 +454,74 @@ def execute_push_task(task_id: int, _: CurrentUser, db: DbSession) -> ReportPush
         .execution_options(populate_existing=True)
     )
     return _push_out(refreshed or task)
+
+
+def _get_push_task(db: DbSession, task_id: int) -> ReportPushTask | None:
+    return db.scalar(
+        select(ReportPushTask)
+        .options(selectinload(ReportPushTask.records))
+        .where(ReportPushTask.id == task_id)
+        .execution_options(populate_existing=True)
+    )
+
+
+def _reset_stale_push(db: DbSession, task: ReportPushTask) -> ReportPushTask | None:
+    cutoff = utcnow() - PUSH_STALE_AFTER
+    if task.status != ReportPushStatus.推送中 or task.updated_at >= cutoff:
+        return task
+    result = db.execute(
+        update(ReportPushTask)
+        .where(
+            ReportPushTask.id == task.id,
+            ReportPushTask.status == ReportPushStatus.推送中,
+            ReportPushTask.updated_at < cutoff,
+        )
+        .values(status=ReportPushStatus.失败, updated_at=utcnow())
+        .execution_options(synchronize_session=False)
+    )
+    if result.rowcount == 1:
+        db.add(
+            ReportPushRecord(
+                push_task_id=task.id,
+                channel=task.channel,
+                target_object=_mask_open_id(task.target_object),
+                recipient_type=task.recipient_type,
+                message_summary="推送超时自动复位",
+                status=ReportPushRecordStatus.失败,
+                error_code="PUSH_TIMEOUT_RESET",
+                error_message="推送超时自动复位",
+                response_snapshot={"code": "PUSH_TIMEOUT_RESET", "msg": "推送超时自动复位"},
+                attempt_no=(task.retry_count or 0) + 1,
+            )
+        )
+        db.commit()
+    else:
+        db.rollback()
+    return _get_push_task(db, task.id)
+
+
+def _safe_exception_summary(exc: Exception, open_ids: list[str]) -> str:
+    return _redact_text(f"{type(exc).__name__}: {exc}", open_ids)[:2000]
+
+
+def _safe_response_data(value: object, open_ids: list[str]) -> object:
+    if isinstance(value, dict):
+        return {key: _safe_response_data(item, open_ids) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_safe_response_data(item, open_ids) for item in value]
+    if isinstance(value, str):
+        return _redact_text(value, open_ids)
+    return value
+
+
+def _redact_text(value: str, open_ids: list[str]) -> str:
+    summary = re.sub(
+        r"Bearer\s+\S+", "Bearer ***REDACTED***", value, flags=re.IGNORECASE
+    )
+    for value in (settings.feishu_app_secret, *open_ids):
+        if value:
+            summary = summary.replace(value, _mask_open_id(value) if value.startswith("ou_") else "***REDACTED***")
+    return summary
 
 
 def _report_overview(report: Report) -> str:

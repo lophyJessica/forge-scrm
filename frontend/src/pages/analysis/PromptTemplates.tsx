@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Alert, Button, Card, Form, Input, Modal, Popconfirm, Select, Table, Tag, message } from 'antd'
 import { http } from '@/api/client'
+import { TABLE_EMPTY } from '@/components/tableEmpty'
 import MaterialComboField from '@/components/MaterialComboField'
 import { TableActions } from '@/components/TableActions'
 import { useAuthStore } from '@/store/auth'
@@ -108,6 +109,7 @@ export default function PromptTemplates() {
       </Form>
 
       <Table<PromptTemplateOut>
+        locale={TABLE_EMPTY}
         rowKey="id"
         loading={loading}
         dataSource={rows}

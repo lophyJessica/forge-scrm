@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from app.models.report import (
     ReportGenerationStatus,
     ReportPushChannel,
+    ReportPushRecordStatus,
     ReportPushRecipientType,
     ReportPushStatus,
     ReportReviewStatus,
@@ -77,7 +78,7 @@ class ReportPushRecordOut(BaseModel):
     recipient_type: ReportPushRecipientType
     message_summary: str
     sent_at: datetime | None = None
-    status: ReportPushStatus
+    status: ReportPushRecordStatus
     provider_message_id: str | None = None
     error_code: str | None = None
     error_message: str | None = None

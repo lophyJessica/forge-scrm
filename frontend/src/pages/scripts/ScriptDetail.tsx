@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Button, Card, Descriptions, Space, Tag, message } from 'antd'
+import { Button, Card, Descriptions, Modal, Space, Tag, message } from 'antd'
 import { ArrowLeftOutlined } from '@ant-design/icons'
 import { http } from '@/api/client'
 import { useAuthStore } from '@/store/auth'
@@ -52,7 +52,17 @@ export default function ScriptDetail() {
               <Button type="primary" onClick={() => act('review', '已通过', { approved: true })}>
                 通过
               </Button>
-              <Button danger onClick={() => act('review', '已驳回', { approved: false })}>
+              <Button
+                danger
+                onClick={() => Modal.confirm({
+                  title: '确认驳回？',
+                  content: '驳回后脚本将返回修改流程。',
+                  okText: '确认驳回',
+                  okType: 'danger',
+                  cancelText: '取消',
+                  onOk: () => act('review', '已驳回', { approved: false }),
+                })}
+              >
                 驳回
               </Button>
             </>
@@ -63,7 +73,17 @@ export default function ScriptDetail() {
             </Button>
           )}
           {['草稿', '待审核', '已通过'].includes(script.status) && (
-            <Button danger onClick={() => act('discard', '已废弃')}>
+            <Button
+              danger
+              onClick={() => Modal.confirm({
+                title: '确认废弃该脚本？',
+                content: '废弃后该脚本将不再进入后续使用流程。',
+                okText: '确认废弃',
+                okType: 'danger',
+                cancelText: '取消',
+                onOk: () => act('discard', '已废弃'),
+              })}
+            >
               废弃
             </Button>
           )}

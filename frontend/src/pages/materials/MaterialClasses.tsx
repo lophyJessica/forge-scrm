@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button, Card, Form, Input, InputNumber, Modal, Popconfirm, Table, message } from 'antd'
 import { http } from '@/api/client'
+import { TABLE_EMPTY } from '@/components/tableEmpty'
 import { TableActions } from '@/components/TableActions'
 import { useAuthStore } from '@/store/auth'
 import type { MaterialClassOut } from '@/types'
@@ -49,6 +50,7 @@ export default function MaterialClasses() {
       }
     >
       <Table<MaterialClassOut>
+        locale={TABLE_EMPTY}
         rowKey="id"
         dataSource={rows}
         pagination={false}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Card, Table, Tag, Tooltip, message } from 'antd'
 import { http } from '@/api/client'
+import { TABLE_EMPTY } from '@/components/tableEmpty'
 import { TableActions } from '@/components/TableActions'
 import type { PageResult, ScriptOut } from '@/types'
 
@@ -35,6 +36,7 @@ export default function ScriptReview() {
   return (
     <Card title="脚本审核（一期仅管理员）">
       <Table<ScriptOut>
+        locale={TABLE_EMPTY}
         rowKey="id"
         loading={loading}
         dataSource={rows}

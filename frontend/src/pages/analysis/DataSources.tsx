@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Alert, Button, Card, Form, Input, Modal, Popconfirm, Select, Switch, Table, Tag, message } from 'antd'
 import { http } from '@/api/client'
+import { TABLE_EMPTY } from '@/components/tableEmpty'
 import { TableActions } from '@/components/TableActions'
 import { useAuthStore } from '@/store/auth'
 import { useMetaStore } from '@/store/meta'
@@ -67,6 +68,7 @@ export default function DataSources() {
         message="一期仅登记数据源并支持「手动录入 / CSV 导入」，不实现自动采集逻辑；采集方式字段已按文档预留。"
       />
       <Table<DataSourceOut>
+        locale={TABLE_EMPTY}
         rowKey="id"
         loading={loading}
         dataSource={rows}

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { type Dayjs } from 'dayjs'
 import { Button, Card, DatePicker, Form, Input, Modal, Progress, Select, Space, Table, Tag, message } from 'antd'
 import { http } from '@/api/client'
+import { TABLE_EMPTY } from '@/components/tableEmpty'
 import { TABLE_PAGINATION, statusTagColor } from '@/theme'
 import type { PageResult, ResearchTaskOut } from '@/types'
 
@@ -106,6 +107,7 @@ export default function ResearchTasks() {
       </Form>
 
       <Table<ResearchTaskOut>
+        locale={TABLE_EMPTY}
         rowKey="id"
         loading={loading}
         dataSource={rows}

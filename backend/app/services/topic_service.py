@@ -161,13 +161,18 @@ def build_prompt(
                 "content_snapshot": DEFAULT_SYSTEM_PROMPT,
             }
 
-    effective_material_ids = list(material_ids)
-    if template is not None and template.material_combo:
-        effective_material_ids = list(dict.fromkeys([*template.material_combo, *material_ids]))
+    template_material_ids = list(dict.fromkeys(template.material_combo or [])) if template is not None else []
+    effective_material_ids = list(dict.fromkeys([*template_material_ids, *material_ids]))
     material_block, materials = build_material_block(db, effective_material_ids)
-    if template is not None and materials:
+    if materials:
+        template_material_set = set(template_material_ids)
         snapshot["material_combo_snapshot"] = [
-            {"id": material.id, "title": material.title, "content": material.content}
+            {
+                "id": material.id,
+                "title": material.title,
+                "content": material.content,
+                "source": "template_combo" if material.id in template_material_set else "manual",
+            }
             for material in materials
         ]
 

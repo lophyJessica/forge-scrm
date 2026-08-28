@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button, Card, Empty, Table, Tag, message } from 'antd'
 import { http } from '@/api/client'
+import { TABLE_EMPTY } from '@/components/tableEmpty'
 import { TableActions } from '@/components/TableActions'
 import { useAuthStore } from '@/store/auth'
 import type { MaterialOut, PageResult } from '@/types'
@@ -43,6 +44,7 @@ export default function MaterialReview() {
   return (
     <Card title="资料审核（待审核队列）">
       <Table<MaterialOut>
+        locale={TABLE_EMPTY}
         rowKey="id"
         loading={loading}
         dataSource={rows}
