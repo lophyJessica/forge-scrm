@@ -4,7 +4,9 @@ import json
 import re
 import threading
 import time
+from dataclasses import dataclass
 from datetime import datetime
+from collections.abc import Callable
 from typing import Any
 
 import httpx
@@ -18,6 +20,7 @@ HTTP_TIMEOUT = 10.0
 CARD_MAX_BYTES = 28 * 1024
 TRUNCATION_NOTICE = "正文超长已截断，完整内容请登录系统查看"
 COLLAPSED_PREVIEW_NOTICE = "正文已折叠展示，完整内容以系统为准"
+CARD_V2_UNSUPPORTED_CODES = {99991672}
 
 _token_lock = threading.Lock()
 _cached_token: str | None = None
@@ -34,6 +37,21 @@ class FeishuPushError(Exception):
     @property
     def summary(self) -> str:
         return json.dumps({"code": self.code, "msg": self.message}, ensure_ascii=False)
+
+
+@dataclass(frozen=True)
+class PushResult:
+    ok: bool
+    summary: str
+    downgraded: bool = False
+
+
+@dataclass(frozen=True)
+class _SendAttempt:
+    ok: bool
+    summary: str
+    http_status: int | None = None
+    code: Any = None
 
 
 def get_tenant_token(*, force_refresh: bool = False) -> str:
@@ -83,10 +101,24 @@ def send_report_card(
     digest: str,
     report_body: str,
     overview: str | None = None,
-) -> tuple[bool, str]:
-    """发送报告卡片；返回成功标记与不含凭据的响应摘要。"""
+) -> PushResult:
+    """优先发送卡片 2.0；组件不支持时仅降级重试一次旧版卡片。"""
 
-    card = _report_card(title, generated_at, digest, report_body, overview)
+    result = _send_card_to(
+        open_id, _report_card_v2(title, generated_at, digest, report_body, overview)
+    )
+    if result.ok:
+        return PushResult(True, result.summary)
+    if not _should_fallback_to_legacy(result):
+        return PushResult(False, result.summary)
+
+    fallback = _send_card_to(
+        open_id, _report_card_legacy(title, generated_at, digest, report_body, overview)
+    )
+    return PushResult(fallback.ok, fallback.summary, downgraded=True)
+
+
+def _send_card_to(open_id: str, card: dict[str, Any]) -> _SendAttempt:
     payload = {
         "receive_id": open_id,
         "msg_type": "interactive",
@@ -96,7 +128,7 @@ def send_report_card(
         try:
             token = get_tenant_token(force_refresh=attempt > 0)
         except FeishuPushError as exc:
-            return False, exc.summary
+            return _SendAttempt(False, exc.summary, code=exc.code)
         try:
             with httpx.Client(timeout=HTTP_TIMEOUT) as client:
                 response = client.post(
@@ -106,36 +138,97 @@ def send_report_card(
                     json=payload,
                 )
         except httpx.HTTPError:
-            return False, json.dumps(
-                {"code": "FEISHU_SEND_NETWORK_ERROR", "msg": "飞书消息请求失败"},
-                ensure_ascii=False,
+            return _SendAttempt(
+                False,
+                json.dumps(
+                    {"code": "FEISHU_SEND_NETWORK_ERROR", "msg": "飞书消息请求失败"},
+                    ensure_ascii=False,
+                ),
+                code="FEISHU_SEND_NETWORK_ERROR",
             )
 
         body = _json_body(response)
         summary = _response_summary(response.status_code, body)
         code = body.get("code")
         if response.status_code < 400 and code == 0:
-            return True, summary
+            return _SendAttempt(True, summary, response.status_code, code)
         if code in TOKEN_INVALID_CODES and attempt == 0:
             continue
-        return False, summary
-    return False, json.dumps(
-        {"code": "FEISHU_SEND_FAILED", "msg": "飞书消息发送失败"},
-        ensure_ascii=False,
+        return _SendAttempt(False, summary, response.status_code, code)
+    return _SendAttempt(
+        False,
+        json.dumps(
+            {"code": "FEISHU_SEND_FAILED", "msg": "飞书消息发送失败"},
+            ensure_ascii=False,
+        ),
+        code="FEISHU_SEND_FAILED",
     )
 
 
-def _report_card(
+def _report_card_v2(
     title: str,
     generated_at: datetime | str | None,
     digest: str,
     report_body: str,
     overview: str | None = None,
 ) -> dict[str, Any]:
-    if isinstance(generated_at, datetime):
-        generated_text = generated_at.strftime("%Y-%m-%d %H:%M:%S")
-    else:
-        generated_text = str(generated_at or "—")
+    generated_text = _generated_text(generated_at)
+    body = _to_lark_md(report_body) or "暂无正文"
+
+    def build(body_text: str) -> dict[str, Any]:
+        elements: list[dict[str, Any]] = [
+            {
+                "tag": "markdown",
+                "content": f"**生成时间**\n{generated_text}",
+            },
+            {
+                "tag": "markdown",
+                "content": f"**摘要**\n{(digest or '—')[:800]}",
+            },
+        ]
+        if overview:
+            elements.append(
+                {
+                    "tag": "markdown",
+                    "content": f"**数据概览**\n{overview}",
+                }
+            )
+        elements.append(
+            {
+                "tag": "collapsible_panel",
+                "expanded": False,
+                "direction": "vertical",
+                "vertical_spacing": "8px",
+                "padding": "8px 8px 8px 8px",
+                "background_color": "grey",
+                "header": {
+                    "title": {"tag": "plain_text", "content": "报告正文（点击展开）"},
+                    "background_color": "grey",
+                },
+                "border": {"color": "grey", "corner_radius": "5px"},
+                "elements": [{"tag": "markdown", "content": body_text}],
+            }
+        )
+        return {
+            "schema": "2.0",
+            "header": {
+                "template": "purple",
+                "title": {"tag": "plain_text", "content": title or "数据报告"},
+            },
+            "body": {"elements": elements},
+        }
+
+    return _fit_card_body(build, body)
+
+
+def _report_card_legacy(
+    title: str,
+    generated_at: datetime | str | None,
+    digest: str,
+    report_body: str,
+    overview: str | None = None,
+) -> dict[str, Any]:
+    generated_text = _generated_text(generated_at)
     body = (_to_lark_md(report_body) or "暂无正文")[:500].rstrip()
     body = f"{body}\n\n{COLLAPSED_PREVIEW_NOTICE}"
 
@@ -172,6 +265,12 @@ def _report_card(
             "elements": elements,
         }
 
+    return _fit_card_body(build, body)
+
+
+def _fit_card_body(
+    build: Callable[[str], dict[str, Any]], body: str
+) -> dict[str, Any]:
     card = build(body)
     if _card_size(card) < CARD_MAX_BYTES:
         return card
@@ -189,6 +288,18 @@ def _report_card(
         else:
             high = middle - 1
     return best
+
+
+def _generated_text(generated_at: datetime | str | None) -> str:
+    if isinstance(generated_at, datetime):
+        return generated_at.strftime("%Y-%m-%d %H:%M:%S")
+    return str(generated_at or "—")
+
+
+def _should_fallback_to_legacy(result: _SendAttempt) -> bool:
+    if result.code in TOKEN_INVALID_CODES:
+        return False
+    return result.http_status == 400 or result.code in CARD_V2_UNSUPPORTED_CODES
 
 
 def _to_lark_md(content: str) -> str:

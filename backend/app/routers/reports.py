@@ -153,6 +153,27 @@ def get_report(report_id: int, _: CurrentUser, db: DbSession) -> ReportOut:
     return ReportOut.model_validate(row)
 
 
+@router.delete("/reports/{report_id}", response_model=OkResult, summary="删除报告")
+def delete_report(
+    report_id: int,
+    db: DbSession,
+    _: User = Depends(require_permission(Permission.报告推送)),
+) -> OkResult:
+    report = db.get(Report, report_id)
+    if not report:
+        raise not_found("报告")
+    if report.generation_status == ReportGenerationStatus.生成中:
+        raise BizError("报告生成中，不可删除")
+    push_task_id = db.scalar(
+        select(ReportPushTask.id).where(ReportPushTask.report_id == report_id).limit(1)
+    )
+    if push_task_id is not None:
+        raise BizError("该报告已有推送记录，为保持对账完整不可删除")
+    db.delete(report)
+    db.commit()
+    return OkResult(message="报告已删除")
+
+
 @router.post("/reports/{report_id}/generate", response_model=ReportOut, summary="触发生成报告")
 def generate_report(report_id: int, _: CurrentUser, db: DbSession) -> ReportOut:
     row = report_executor.generate_report(db, report_id)
@@ -385,13 +406,20 @@ def execute_push_task(
         all_succeeded = True
         for open_id in pending_open_ids:
             current_target = _mask_open_id(open_id)
-            succeeded, response_summary = feishu_push.send_report_card(
+            push_result = feishu_push.send_report_card(
                 open_id,
                 title,
                 report.generated_at,
                 digest,
                 report.content,
                 _report_overview(report),
+            )
+            succeeded = push_result.ok
+            response_summary = push_result.summary
+            record_message_summary = (
+                f"{message_summary} / 卡片2.0降级"
+                if push_result.downgraded
+                else message_summary
             )
             response_data = _safe_response_data(
                 _response_data(response_summary), open_ids
@@ -404,7 +432,7 @@ def execute_push_task(
                     channel=task.channel,
                     target_object=_mask_open_id(open_id),
                     recipient_type=task.recipient_type,
-                    message_summary=message_summary,
+                    message_summary=record_message_summary,
                     sent_at=utcnow() if succeeded else None,
                     status=(
                         ReportPushRecordStatus.已推送

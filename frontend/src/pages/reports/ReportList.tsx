@@ -77,6 +77,20 @@ export default function ReportList() {
     }
   }
 
+  const remove = (row: ReportOut) => {
+    Modal.confirm({
+      title: '确认删除该报告？删除后不可恢复',
+      okText: '删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        await http.delete(`/reports/${row.id}`)
+        message.success('报告已删除')
+        await load(page)
+      },
+    })
+  }
+
   return (
     <Card title="数据报告" extra={<Button type="primary" onClick={() => { form.resetFields(); setModalOpen(true) }}>新建报告</Button>}>
       <Form form={queryForm} layout="inline" style={{ marginBottom: 16 }} onFinish={() => load(1)}>
@@ -132,6 +146,9 @@ export default function ReportList() {
                     <Button key="retry" size="small" type="link" loading={running === row.id} onClick={() => run(row, 'retry')}>重试</Button>
                   ) : null,
                   <Button key="view" size="small" onClick={() => navigate(`/reports/${row.id}`)}>查看</Button>,
+                  row.generation_status !== '生成中' ? (
+                    <Button key="delete" type="link" size="small" danger onClick={() => remove(row)}>删除</Button>
+                  ) : null,
                 ]}
               />
             ),

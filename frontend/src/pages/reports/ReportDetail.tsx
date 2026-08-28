@@ -137,6 +137,21 @@ export default function ReportDetail() {
     })
   }
 
+  const deleteReport = () => {
+    if (!id) return
+    Modal.confirm({
+      title: '确认删除该报告？删除后不可恢复',
+      okText: '删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        await http.delete(`/reports/${id}`)
+        message.success('报告已删除')
+        navigate('/reports')
+      },
+    })
+  }
+
   if (loading) return <Card><Skeleton active /></Card>
   if (!report) return <Alert type="error" message="报告不存在或加载失败" />
 
@@ -158,6 +173,9 @@ export default function ReportDetail() {
               <Tooltip title={pushConfig?.configured ? undefined : PUSH_CONFIG_ERROR}>
                 <Button type="primary" onClick={openCreatePush}>创建推送</Button>
               </Tooltip>
+            )}
+            {report.generation_status !== '生成中' && (
+              <Button type="link" danger onClick={deleteReport}>删除</Button>
             )}
           </Space>
         )}
