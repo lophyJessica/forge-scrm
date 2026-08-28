@@ -202,8 +202,19 @@ def _report_card_v2(
                 "padding": "8px 8px 8px 8px",
                 "background_color": "grey",
                 "header": {
-                    "title": {"tag": "plain_text", "content": "报告正文（点击展开）"},
+                    "title": {
+                        "tag": "plain_text",
+                        "content": "报告正文（点击展开/收起）",
+                    },
                     "background_color": "grey",
+                    "vertical_align": "center",
+                    "icon": {
+                        "tag": "standard_icon",
+                        "token": "down-small-ccm_outlined",
+                        "size": "16px 16px",
+                    },
+                    "icon_position": "right",
+                    "icon_expanded_angle": -180,
                 },
                 "border": {"color": "grey", "corner_radius": "5px"},
                 "elements": [{"tag": "markdown", "content": body_text}],
