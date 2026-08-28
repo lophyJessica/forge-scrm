@@ -31,6 +31,17 @@ export default function MaterialForm() {
     }
   }, [id, isEdit, form])
 
+  const activate = async (materialId: number, status: string | undefined) => {
+    if (status === '草稿') {
+      await http.post(`/materials/${materialId}/submit`)
+    }
+    if (status === '草稿' || status === '待审核') {
+      await http.post(`/materials/${materialId}/review`, { approved: true })
+      return true
+    }
+    return status === '已生效'
+  }
+
   const submit = async (action: 'draft' | 'review' | 'save') => {
     const values = await form.validateFields()
     const validRange = values.valid_range
@@ -51,25 +62,39 @@ export default function MaterialForm() {
     }
     setSavingAction(action)
     try {
+      let isActive = false
       if (isEdit) {
         await http.put(`/materials/${id}`, payload)
         if (action === 'review' && materialStatus === '草稿') {
           await http.post(`/materials/${id}/submit`)
+        } else if (action === 'save') {
+          isActive = await activate(Number(id), materialStatus)
         }
       } else {
-        await http.post('/materials', {
+        const { data } = await http.post<MaterialOut>('/materials', {
           ...payload,
-          submit_for_review: action === 'review',
+          submit_for_review: false,
         })
+        if (action === 'save') {
+          isActive = await activate(data.id, data.status)
+        }
       }
-      message.success(action === 'draft' ? '草稿已保存' : action === 'review' ? '已提交审核' : '保存成功')
+      message.success(
+        action === 'draft'
+          ? '已存为草稿'
+          : action === 'review'
+            ? '已提交审核'
+            : isActive
+              ? '保存成功，资料已生效'
+              : '保存成功',
+      )
       navigate('/materials')
     } finally {
       setSavingAction(undefined)
     }
   }
 
-  const canChooseReviewFlow = !isEdit || materialStatus === '草稿'
+  const canSaveDraft = !isEdit || materialStatus === '草稿'
 
   return (
     <Card title={isEdit ? `编辑资料 #${id}` : '新建资料'}>
@@ -107,20 +132,14 @@ export default function MaterialForm() {
         </Form.Item>
         <div className="form-actions">
           <Button onClick={() => navigate('/materials')}>取消</Button>
-          {canChooseReviewFlow ? (
-            <>
-              <Button disabled={!!savingAction} loading={savingAction === 'draft'} onClick={() => void submit('draft')}>
-                保存草稿
-              </Button>
-              <Button type="primary" disabled={!!savingAction} loading={savingAction === 'review'} onClick={() => void submit('review')}>
-                提交审核
-              </Button>
-            </>
-          ) : (
-            <Button type="primary" disabled={!!savingAction} loading={savingAction === 'save'} onClick={() => void submit('save')}>
-              保存修改
+          {canSaveDraft && (
+            <Button disabled={!!savingAction} loading={savingAction === 'draft'} onClick={() => void submit('draft')}>
+              存为草稿
             </Button>
           )}
+          <Button type="primary" disabled={!!savingAction} loading={savingAction === 'save'} onClick={() => void submit('save')}>
+            保存
+          </Button>
         </div>
         </Form>
       </div>
