@@ -1,15 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Alert, Button, Card, Form, Input, InputNumber, Modal, Radio, Select, Space, Table, Tooltip, message } from 'antd'
 import { http } from '@/api/client'
 import { TABLE_EMPTY } from '@/components/tableEmpty'
 import { useMetaStore } from '@/store/meta'
-import type { MaterialOut, PageResult, ScriptOut, TopicOut } from '@/types'
-
-interface BuiltinPrompt {
-  task_type: '选题生成' | '脚本生成'
-  content: string
-}
+import type { MaterialOut, PageResult, PromptTemplateOut, ScriptOut, TopicOut } from '@/types'
 
 interface GenerateResult {
   topic_id: number
@@ -25,11 +20,24 @@ export default function ScriptGenerate() {
   const options = useMetaStore((s) => s.options)
   const [topics, setTopics] = useState<TopicOut[]>([])
   const [materials, setMaterials] = useState<MaterialOut[]>([])
-  const [builtinPrompts, setBuiltinPrompts] = useState<BuiltinPrompt[]>([])
+  const [promptTemplates, setPromptTemplates] = useState<PromptTemplateOut[]>([])
+  const [templatesLoading, setTemplatesLoading] = useState(false)
   const [loading, setLoading] = useState(false)
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false)
   const [saveTemplateName, setSaveTemplateName] = useState('自定义脚本提示词')
   const [result, setResult] = useState<GenerateResult | null>(null)
+
+  const loadPromptTemplates = useCallback(async () => {
+    setTemplatesLoading(true)
+    try {
+      const { data } = await http.get<PageResult<PromptTemplateOut>>('/prompt-templates', {
+        params: { task_type: '脚本生成', status: '启用', page_size: 200 },
+      })
+      setPromptTemplates(data.items)
+    } finally {
+      setTemplatesLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     void http
@@ -38,16 +46,10 @@ export default function ScriptGenerate() {
     void http
       .get<PageResult<MaterialOut>>('/materials', { params: { status: '已生效', page_size: 200 } })
       .then((r) => setMaterials(r.data.items))
-    void http
-      .get<BuiltinPrompt[]>('/prompt-templates/builtin')
-      .then((r) => {
-        const prompts = r.data.filter((item) => item.task_type === '脚本生成')
-        setBuiltinPrompts(prompts)
-        if (prompts[0]) form.setFieldValue('builtin_prompt_type', prompts[0].task_type)
-      })
+    void loadPromptTemplates()
     const topicId = search.get('topic_id')
     if (topicId) form.setFieldValue('topic_id', Number(topicId))
-  }, [search, form])
+  }, [search, form, loadPromptTemplates])
 
   const run = async () => {
     const values = await form.validateFields()
@@ -57,6 +59,9 @@ export default function ScriptGenerate() {
       content_elements: values.content_elements || [],
       version_count: values.version_count,
       material_ids: values.material_ids || [],
+      ...(values.prompt_mode === 'builtin' && values.prompt_template_id
+        ? { prompt_template_id: values.prompt_template_id }
+        : {}),
       ...(values.prompt_mode === 'custom' ? { prompt_content: values.prompt_content } : {}),
     }
     setLoading(true)
@@ -71,8 +76,8 @@ export default function ScriptGenerate() {
 
   const promptMode = Form.useWatch('prompt_mode', form) || 'builtin'
   const promptContent = Form.useWatch('prompt_content', form) || ''
-  const builtinPromptType = Form.useWatch('builtin_prompt_type', form)
-  const selectedBuiltin = builtinPrompts.find((prompt) => prompt.task_type === builtinPromptType)
+  const promptTemplateId = Form.useWatch('prompt_template_id', form)
+  const selectedTemplate = promptTemplates.find((template) => template.id === promptTemplateId)
 
   const openSaveTemplate = () => {
     if (!promptContent.trim()) {
@@ -92,6 +97,7 @@ export default function ScriptGenerate() {
     await http.post('/prompt-templates', { task_type: '脚本生成', name, content: promptContent.trim() })
     message.success('已保存到模板库')
     setSaveTemplateOpen(false)
+    void loadPromptTemplates()
   }
 
   return (
@@ -108,7 +114,7 @@ export default function ScriptGenerate() {
             form={form}
             layout="vertical"
             style={{ width: '100%' }}
-            initialValues={{ version_count: 3, content_elements: [], prompt_mode: 'builtin', builtin_prompt_type: '脚本生成' }}
+            initialValues={{ version_count: 3, content_elements: [], prompt_mode: 'builtin' }}
           >
           <Form.Item name="topic_id" label="来源选题（仅「已选定」）" rules={[{ required: true }]}>
             <Select
@@ -137,19 +143,20 @@ export default function ScriptGenerate() {
             <Radio.Group options={[{ label: '模板库', value: 'builtin' }, { label: '自定义', value: 'custom' }]} />
           </Form.Item>
           {promptMode === 'builtin' ? (
-            <Form.Item name="builtin_prompt_type" label="模板库">
-              <Tooltip title={selectedBuiltin?.content} placement="topLeft">
+            <Form.Item name="prompt_template_id" label="模板库">
+              <Tooltip title={selectedTemplate?.content} placement="topLeft">
                 <Select
-                  loading={!builtinPrompts.length}
-                  placeholder="选择模板（默认即可）"
-                  options={builtinPrompts.map((prompt) => ({
-                    value: prompt.task_type,
-                    label: `${prompt.task_type}：${prompt.content}`,
+                  allowClear
+                  loading={templatesLoading}
+                  placeholder="选择模板（不选则使用默认模板）"
+                  options={promptTemplates.map((template) => ({
+                    value: template.id,
+                    label: `${template.name}：${template.content}`,
                   }))}
                   optionRender={(option) => (
                     <div style={{ whiteSpace: 'normal', lineHeight: 1.5 }}>{option.data.label}</div>
                   )}
-                  labelRender={(props) => (
+                  labelRender={() => (
                     <span
                       style={{
                         display: 'inline-block',
@@ -160,7 +167,7 @@ export default function ScriptGenerate() {
                         verticalAlign: 'middle',
                       }}
                     >
-                      {props.label}
+                      {selectedTemplate?.name}
                     </span>
                   )}
                 />

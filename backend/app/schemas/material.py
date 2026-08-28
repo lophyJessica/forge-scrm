@@ -56,8 +56,7 @@ class MaterialBase(BaseModel):
     source_type: SourceType
     source_url: str | None = Field(None, max_length=500)
     trust_level: TrustLevel
-    # 有效期：页面已不展示/不填（2026-08-26 用户决定），保留数据库字段，
-    # 创建时给默认值（当天 ~ +365天）满足非空约束
+    # 有效期非必填；未传时使用默认的一年有效期满足数据库非空约束。
     valid_from: date = Field(default_factory=date.today)
     valid_until: date = Field(default_factory=lambda: date.today() + timedelta(days=365))
 

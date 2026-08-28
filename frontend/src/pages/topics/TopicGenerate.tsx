@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Alert,
@@ -7,7 +7,6 @@ import {
   Divider,
   Form,
   Input,
-  InputNumber,
   Modal,
   Radio,
   Select,
@@ -20,7 +19,7 @@ import {
 import { http } from '@/api/client'
 import { TABLE_EMPTY } from '@/components/tableEmpty'
 import { useMetaStore } from '@/store/meta'
-import type { MaterialOut, PageResult, TopicGenerateResult } from '@/types'
+import type { MaterialOut, PageResult, PromptTemplateOut, TopicGenerateResult } from '@/types'
 
 interface BusinessDirection {
   id: number
@@ -32,11 +31,6 @@ interface SpecialtyItem {
   business_direction_id: number
   name: string
   enumValue: string
-}
-
-interface BuiltinPrompt {
-  task_type: '选题生成' | '脚本生成'
-  content: string
 }
 
 /** 静态兜底：后端方向表接口未就绪时使用（待后端接口替换） */
@@ -63,7 +57,8 @@ export default function TopicGenerate() {
   const options = useMetaStore((s) => s.options)
   const specialtyEnums = options('specialty')
   const [materials, setMaterials] = useState<MaterialOut[]>([])
-  const [builtinPrompts, setBuiltinPrompts] = useState<BuiltinPrompt[]>([])
+  const [promptTemplates, setPromptTemplates] = useState<PromptTemplateOut[]>([])
+  const [templatesLoading, setTemplatesLoading] = useState(false)
   const [loading, setLoading] = useState(false)
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false)
   const [saveTemplateName, setSaveTemplateName] = useState('自定义选题提示词')
@@ -77,17 +72,23 @@ export default function TopicGenerate() {
   const [addingSpecialty, setAddingSpecialty] = useState(false)
   const [newSpecialtyName, setNewSpecialtyName] = useState('')
 
+  const loadPromptTemplates = useCallback(async () => {
+    setTemplatesLoading(true)
+    try {
+      const { data } = await http.get<PageResult<PromptTemplateOut>>('/prompt-templates', {
+        params: { task_type: '选题生成', status: '启用', page_size: 200 },
+      })
+      setPromptTemplates(data.items)
+    } finally {
+      setTemplatesLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     void http
       .get<PageResult<MaterialOut>>('/materials', { params: { status: '已生效', page_size: 200 } })
       .then((r) => setMaterials(r.data.items))
-    void http
-      .get<BuiltinPrompt[]>('/prompt-templates/builtin')
-      .then((r) => {
-        const prompts = r.data.filter((item) => item.task_type === '选题生成')
-        setBuiltinPrompts(prompts)
-        if (prompts[0]) form.setFieldValue('builtin_prompt_type', prompts[0].task_type)
-      })
+    void loadPromptTemplates()
 
     void (async () => {
       try {
@@ -118,7 +119,7 @@ export default function TopicGenerate() {
         setDirectionsFromApi(false)
       }
     })()
-  }, [form])
+  }, [form, loadPromptTemplates])
 
   const specialtyOptions = useMemo(() => {
     if (!selectedBusinessId) return []
@@ -220,7 +221,10 @@ export default function TopicGenerate() {
       direction: values.direction,
       specialty: values.specialty,
       material_ids: values.material_ids || [],
-      count: values.count,
+      count: 10,
+      ...(values.prompt_mode === 'builtin' && values.prompt_template_id
+        ? { prompt_template_id: values.prompt_template_id }
+        : {}),
       ...(values.prompt_mode === 'custom' ? { prompt_content: values.prompt_content } : {}),
     }
     setLoading(true)
@@ -235,8 +239,8 @@ export default function TopicGenerate() {
 
   const promptMode = Form.useWatch('prompt_mode', form) || 'builtin'
   const promptContent = Form.useWatch('prompt_content', form) || ''
-  const builtinPromptType = Form.useWatch('builtin_prompt_type', form)
-  const selectedBuiltin = builtinPrompts.find((prompt) => prompt.task_type === builtinPromptType)
+  const promptTemplateId = Form.useWatch('prompt_template_id', form)
+  const selectedTemplate = promptTemplates.find((template) => template.id === promptTemplateId)
 
   const openSaveTemplate = () => {
     if (!promptContent.trim()) {
@@ -256,6 +260,7 @@ export default function TopicGenerate() {
     await http.post('/prompt-templates', { task_type: '选题生成', name, content: promptContent.trim() })
     message.success('已保存到模板库')
     setSaveTemplateOpen(false)
+    void loadPromptTemplates()
   }
 
   return (
@@ -271,7 +276,7 @@ export default function TopicGenerate() {
           <Form
             form={form}
             layout="vertical"
-            initialValues={{ count: 10, prompt_mode: 'builtin', builtin_prompt_type: '选题生成' }}
+            initialValues={{ prompt_mode: 'builtin' }}
             style={{ width: '100%' }}
           >
           <Form.Item name="direction" hidden rules={[{ required: true }]}>
@@ -361,8 +366,8 @@ export default function TopicGenerate() {
             />
           </Form.Item>
 
-          <Form.Item name="count" label="生成条数（上限 10）">
-            <InputNumber min={1} max={10} />
+          <Form.Item label="生成数量">
+            <span>每方向 10 条</span>
           </Form.Item>
           <Form.Item name="material_ids" label="参考资料（仅可选「已生效」资料）">
             <Select
@@ -376,19 +381,20 @@ export default function TopicGenerate() {
             <Radio.Group options={[{ label: '模板库', value: 'builtin' }, { label: '自定义', value: 'custom' }]} />
           </Form.Item>
           {promptMode === 'builtin' ? (
-            <Form.Item name="builtin_prompt_type" label="模板库">
-              <Tooltip title={selectedBuiltin?.content} placement="topLeft">
+            <Form.Item name="prompt_template_id" label="模板库">
+              <Tooltip title={selectedTemplate?.content} placement="topLeft">
                 <Select
-                  loading={!builtinPrompts.length}
-                  placeholder="选择模板（默认即可）"
-                  options={builtinPrompts.map((prompt) => ({
-                    value: prompt.task_type,
-                    label: `${prompt.task_type}：${prompt.content}`,
+                  allowClear
+                  loading={templatesLoading}
+                  placeholder="选择模板（不选则使用默认模板）"
+                  options={promptTemplates.map((template) => ({
+                    value: template.id,
+                    label: `${template.name}：${template.content}`,
                   }))}
                   optionRender={(option) => (
                     <div style={{ whiteSpace: 'normal', lineHeight: 1.5 }}>{option.data.label}</div>
                   )}
-                  labelRender={(props) => (
+                  labelRender={() => (
                     <span
                       style={{
                         display: 'inline-block',
@@ -399,7 +405,7 @@ export default function TopicGenerate() {
                         verticalAlign: 'middle',
                       }}
                     >
-                      {props.label}
+                      {selectedTemplate?.name}
                     </span>
                   )}
                 />

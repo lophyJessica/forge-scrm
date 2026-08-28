@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Form, Input, Select, Space } from 'antd'
+import { Collapse, Form, Input, Select, Space, Typography } from 'antd'
 import { http } from '@/api/client'
 import type { MaterialClassOut, MaterialOut, PageResult, TagOut } from '@/types'
 
@@ -52,6 +52,14 @@ export default function MaterialComboField() {
     }))
   }, [classId, keyword, materials, selectedIds, tag])
 
+  const selectedMaterials = useMemo(() => {
+    const materialById = new Map(materials.map((material) => [material.id, material]))
+    return selectedIds.flatMap((id) => {
+      const material = materialById.get(id)
+      return material ? [material] : []
+    })
+  }, [materials, selectedIds])
+
   return (
     <Space direction="vertical" size={8} style={{ display: 'flex' }}>
       <Space wrap>
@@ -97,6 +105,31 @@ export default function MaterialComboField() {
           options={options}
         />
       </Form.Item>
+      {selectedMaterials.length > 0 && (
+        <Collapse
+          size="small"
+          items={[
+            {
+              key: 'material-preview',
+              label: `引用预览（${selectedMaterials.length} 条）`,
+              children: (
+                <Space direction="vertical" size={8} style={{ display: 'flex' }}>
+                  {selectedMaterials.map((material) => (
+                    <div key={material.id}>
+                      <Typography.Text strong>
+                        【{material.class_name || '未分类'}】{material.title}
+                      </Typography.Text>
+                      <Typography.Paragraph style={{ margin: 0 }} type="secondary">
+                        {material.content.slice(0, 200)}{material.content.length > 200 ? '...' : ''}
+                      </Typography.Paragraph>
+                    </div>
+                  ))}
+                </Space>
+              ),
+            },
+          ]}
+        />
+      )}
     </Space>
   )
 }

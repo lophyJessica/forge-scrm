@@ -12,7 +12,11 @@ import type { PageResult, PromptTemplateOut } from '@/types'
 const TASK_TYPE_OPTIONS = [
   { label: '选题生成', value: '选题生成' },
   { label: '脚本生成', value: '脚本生成' },
+  { label: '资料分析', value: '资料分析' },
+  { label: '数据分析', value: '数据分析' },
 ]
+
+const ANALYSIS_TASK_TYPES = new Set(['资料分析', '数据分析'])
 
 function formatTime(value: string | undefined) {
   return value ? value.replace('T', ' ').slice(0, 19) : '—'
@@ -29,6 +33,7 @@ export default function PromptTemplates() {
   const [loading, setLoading] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<PromptTemplateOut | null>(null)
+  const taskType = Form.useWatch('task_type', form)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -47,18 +52,38 @@ export default function PromptTemplates() {
   const openModal = (row?: PromptTemplateOut) => {
     setEditing(row ?? null)
     form.resetFields()
-    form.setFieldsValue(row ? row : { task_type: '选题生成' })
+    form.setFieldsValue(row
+      ? {
+          ...row,
+          output_schema_text: row.output_schema ? JSON.stringify(row.output_schema, null, 2) : '',
+        }
+      : { task_type: '选题生成' })
     setModalOpen(true)
   }
 
   const save = async () => {
     const values = await form.validateFields()
+    let outputSchema: Record<string, unknown> | null = null
+    if (ANALYSIS_TASK_TYPES.has(values.task_type)) {
+      try {
+        const parsed = JSON.parse(values.output_schema_text)
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          message.error('输出字段定义必须是 JSON 对象')
+          return
+        }
+        outputSchema = parsed
+      } catch {
+        message.error('输出字段定义必须是合法 JSON')
+        return
+      }
+    }
     const payload = {
       name: values.name,
       content: values.content,
       task_type: values.task_type,
       material_combo: values.material_combo || [],
-      status: '启用',
+      output_schema: outputSchema,
+      status: editing?.status || '启用',
     }
     if (editing) {
       await http.put(`/prompt-templates/${editing.id}`, payload)
@@ -173,6 +198,18 @@ export default function PromptTemplates() {
           <Form.Item name="content" label="提示词正文" rules={[{ required: true, message: '请输入提示词正文' }]}>
             <Input.TextArea rows={14} showCount />
           </Form.Item>
+          {ANALYSIS_TASK_TYPES.has(taskType) && (
+            <Form.Item
+              name="output_schema_text"
+              label="输出字段定义 JSON"
+              rules={[{ required: true, whitespace: true, message: '分析类模板必须填写输出字段定义' }]}
+            >
+              <Input.TextArea
+                rows={6}
+                placeholder='例如：{"results":[{"conclusion":"string","suggestions":["string"]}]}'
+              />
+            </Form.Item>
+          )}
           <MaterialComboField />
         </Form>
       </Modal>

@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Button, Card, Empty, Table, Tag, message } from 'antd'
+import { Button, Card, Table, Tag, message } from 'antd'
 import { http } from '@/api/client'
 import { TABLE_EMPTY } from '@/components/tableEmpty'
 import { TableActions } from '@/components/TableActions'
-import { useAuthStore } from '@/store/auth'
 import type { MaterialOut, PageResult } from '@/types'
 
 export default function MaterialReview() {
-  const isAdmin = useAuthStore((s) => s.isAdmin)()
   const [rows, setRows] = useState<MaterialOut[]>([])
   const [loading, setLoading] = useState(false)
 
@@ -31,14 +29,6 @@ export default function MaterialReview() {
     await http.post(`/materials/${id}/review`, { approved })
     message.success(approved ? '已通过，资料生效' : '已驳回')
     void load()
-  }
-
-  if (!isAdmin) {
-    return (
-      <Card title="资料审核">
-        <Empty description="一期审核入口仅管理员可用（context/06 §2.2）" />
-      </Card>
-    )
   }
 
   return (
