@@ -44,6 +44,11 @@ class Settings(BaseSettings):
     tavily_base_url: str = "https://api.tavily.com/search"
     tavily_timeout: int = 30
 
+    # 飞书企业自建应用推送（凭据只从环境变量读取）
+    feishu_app_id: str = ""
+    feishu_app_secret: str = ""
+    feishu_push_open_ids: str = ""
+
     # 本地文件存储（D-T4）
     data_dir: str = "./data"
 

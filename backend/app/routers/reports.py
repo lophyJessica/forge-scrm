@@ -1,17 +1,21 @@
-"""数据报告 CRUD、生成/重试与推送骨架。路由 prefix 统一 /api。"""
+"""数据报告 CRUD、生成/重试与飞书推送。路由 prefix 统一 /api。"""
 
+import json
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
+from app.core.config import settings
 from app.core.deps import CurrentUser, DbSession
 from app.core.exceptions import BizError, not_found
+from app.models.base import utcnow
 from app.models.report import (
     Report,
     ReportGenerationStatus,
     ReportPushRecord,
+    ReportPushChannel,
     ReportPushStatus,
     ReportPushTask,
     ReportReviewStatus,
@@ -25,12 +29,14 @@ from app.schemas.report import (
     ReportPushTaskCreate,
     ReportPushTaskOut,
 )
-from app.services import report_executor
+from app.services import feishu_push, report_executor
 
 router = APIRouter(prefix="/api", tags=["数据报告"])
 
-# TODO(待实测): 飞书/微信渠道 API、授权方式、限流和消息格式均未确认，发送接口固定返回 501。
-CHANNEL_NOT_IMPLEMENTED = "飞书/微信渠道 API 待实测，发送暂不可用"
+FEISHU_CONFIG_ERROR = (
+    "未配置飞书推送，请联系管理员设置 "
+    "FEISHU_APP_ID/FEISHU_APP_SECRET/FEISHU_PUSH_OPEN_IDS"
+)
 
 
 def _no(prefix: str) -> str:
@@ -215,7 +221,7 @@ def get_push_task(task_id: int, _: CurrentUser, db: DbSession) -> ReportPushTask
 @router.post(
     "/push-tasks/{task_id}/execute",
     response_model=ReportPushTaskOut,
-    summary="执行推送（渠道 API 待实测，返回 501）",
+    summary="执行飞书推送",
 )
 def execute_push_task(task_id: int, _: CurrentUser, db: DbSession) -> ReportPushTaskOut:
     task = db.scalar(
@@ -228,37 +234,72 @@ def execute_push_task(task_id: int, _: CurrentUser, db: DbSession) -> ReportPush
     if task.status == ReportPushStatus.推送中:
         raise BizError("推送任务执行中，禁止重复触发", code=409)
 
+    if task.channel != ReportPushChannel.飞书:
+        task.status = ReportPushStatus.待推送
+        db.commit()
+        raise BizError("当前仅支持飞书推送")
+
+    open_ids = [item.strip() for item in settings.feishu_push_open_ids.split(",") if item.strip()]
+    if not settings.feishu_app_id or not settings.feishu_app_secret or not open_ids:
+        task.status = ReportPushStatus.待推送
+        db.commit()
+        raise BizError(FEISHU_CONFIG_ERROR)
+
     if task.status == ReportPushStatus.失败:
         task.retry_count = (task.retry_count or 0) + 1
 
     task.status = ReportPushStatus.推送中
     db.commit()
 
-    # TODO(待实测): 在此接入飞书/微信发送。不得把 token/key 写入记录或日志。
-    attempt_no = (
-        db.scalar(
-            select(func.count()).select_from(ReportPushRecord).where(ReportPushRecord.push_task_id == task.id)
-        )
-        or 0
-    ) + 1
+    report = db.get(Report, task.report_id)
+    if report is None:
+        task.status = ReportPushStatus.失败
+        db.commit()
+        raise not_found("报告")
+
+    attempt_no = (task.retry_count or 0) + 1
     message_summary = _message_summary(task)
-    record = ReportPushRecord(
-        push_task_id=task.id,
-        channel=task.channel,
-        target_object=task.target_object,
-        recipient_type=task.recipient_type,
-        message_summary=message_summary,
-        sent_at=None,
-        status=ReportPushStatus.失败,
-        error_code="CHANNEL_API_NOT_IMPLEMENTED",
-        error_message=CHANNEL_NOT_IMPLEMENTED,
-        response_snapshot={"implemented": False, "todo": "渠道 API 待实测"},
-        attempt_no=attempt_no,
-    )
-    task.status = ReportPushStatus.失败
-    db.add(record)
+    config = task.message_config or {}
+    title = str(config.get("title") or report.title)
+    digest = str(config.get("summary") or report.summary or "")
+    all_succeeded = True
+    for open_id in open_ids:
+        succeeded, response_summary = feishu_push.send_report_card(
+            open_id,
+            title,
+            report.generated_at,
+            digest,
+        )
+        response_data = _response_data(response_summary)
+        provider_code = response_data.get("code")
+        provider_message_id = response_data.get("message_id")
+        db.add(
+            ReportPushRecord(
+                push_task_id=task.id,
+                channel=task.channel,
+                target_object=open_id,
+                recipient_type=task.recipient_type,
+                message_summary=message_summary,
+                sent_at=utcnow() if succeeded else None,
+                status=ReportPushStatus.已推送 if succeeded else ReportPushStatus.失败,
+                provider_message_id=str(provider_message_id) if provider_message_id else None,
+                error_code=None if succeeded else str(provider_code or "FEISHU_SEND_FAILED")[:64],
+                error_message=None if succeeded else str(response_data.get("msg") or "飞书发送失败")[:2000],
+                response_snapshot=response_data,
+                attempt_no=attempt_no,
+            )
+        )
+        all_succeeded = all_succeeded and succeeded
+
+    task.status = ReportPushStatus.已推送 if all_succeeded else ReportPushStatus.失败
     db.commit()
-    raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail=CHANNEL_NOT_IMPLEMENTED)
+    refreshed = db.scalar(
+        select(ReportPushTask)
+        .options(selectinload(ReportPushTask.records))
+        .where(ReportPushTask.id == task.id)
+        .execution_options(populate_existing=True)
+    )
+    return _push_out(refreshed or task)
 
 
 def _message_summary(task: ReportPushTask) -> str:
@@ -269,3 +310,13 @@ def _message_summary(task: ReportPushTask) -> str:
     parts = [str(item) for item in (title, report_type, summary) if item]
     text = " / ".join(parts) if parts else f"报告#{task.report_id} 推送摘要"
     return text[:2000]
+
+
+def _response_data(summary: str) -> dict:
+    try:
+        data = json.loads(summary)
+    except (TypeError, ValueError):
+        return {"code": "FEISHU_INVALID_SUMMARY", "msg": "飞书响应摘要格式异常"}
+    if isinstance(data, dict):
+        return data
+    return {"code": "FEISHU_INVALID_SUMMARY", "msg": "飞书响应摘要格式异常"}
