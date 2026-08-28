@@ -1,6 +1,7 @@
 """飞书企业自建应用消息推送。凭据与 token 仅驻留进程内存。"""
 
 import json
+import re
 import threading
 import time
 from datetime import datetime
@@ -14,6 +15,8 @@ TOKEN_URL = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/intern
 MESSAGE_URL = "https://open.feishu.cn/open-apis/im/v1/messages"
 TOKEN_INVALID_CODES = {99991663, 99991661}
 HTTP_TIMEOUT = 10.0
+CARD_MAX_BYTES = 28 * 1024
+TRUNCATION_NOTICE = "正文超长已截断，完整内容请登录系统查看"
 
 _token_lock = threading.Lock()
 _cached_token: str | None = None
@@ -75,10 +78,12 @@ def send_report_card(
     title: str,
     generated_at: datetime | str | None,
     digest: str,
+    report_body: str,
+    overview: str | None = None,
 ) -> tuple[bool, str]:
     """发送报告卡片；返回成功标记与不含凭据的响应摘要。"""
 
-    card = _report_card(title, generated_at, digest)
+    card = _report_card(title, generated_at, digest, report_body, overview)
     payload = {
         "receive_id": open_id,
         "msg_type": "interactive",
@@ -117,18 +122,21 @@ def send_report_card(
     )
 
 
-def _report_card(title: str, generated_at: datetime | str | None, digest: str) -> dict[str, Any]:
+def _report_card(
+    title: str,
+    generated_at: datetime | str | None,
+    digest: str,
+    report_body: str,
+    overview: str | None = None,
+) -> dict[str, Any]:
     if isinstance(generated_at, datetime):
         generated_text = generated_at.strftime("%Y-%m-%d %H:%M:%S")
     else:
         generated_text = str(generated_at or "—")
-    return {
-        "config": {"wide_screen_mode": True},
-        "header": {
-            "template": "purple",
-            "title": {"tag": "plain_text", "content": title or "数据报告"},
-        },
-        "elements": [
+    body = _to_lark_md(report_body) or "暂无正文"
+
+    def build(body_text: str) -> dict[str, Any]:
+        elements: list[dict[str, Any]] = [
             {
                 "tag": "div",
                 "text": {"tag": "lark_md", "content": f"**生成时间**\n{generated_text}"},
@@ -137,8 +145,70 @@ def _report_card(title: str, generated_at: datetime | str | None, digest: str) -
                 "tag": "div",
                 "text": {"tag": "lark_md", "content": f"**摘要**\n{(digest or '—')[:800]}"},
             },
-        ],
-    }
+        ]
+        if overview:
+            elements.append(
+                {
+                    "tag": "div",
+                    "text": {"tag": "lark_md", "content": f"**数据概览**\n{overview}"},
+                }
+            )
+        elements.append(
+            {
+                "tag": "div",
+                "text": {"tag": "lark_md", "content": f"**报告正文**\n\n{body_text}"},
+            }
+        )
+        return {
+            "config": {"wide_screen_mode": True},
+            "header": {
+                "template": "purple",
+                "title": {"tag": "plain_text", "content": title or "数据报告"},
+            },
+            "elements": elements,
+        }
+
+    card = build(body)
+    if _card_size(card) < CARD_MAX_BYTES:
+        return card
+
+    low, high = 0, len(body)
+    best = build(TRUNCATION_NOTICE)
+    while low <= high:
+        middle = (low + high) // 2
+        prefix = body[:middle].rstrip()
+        candidate_body = f"{prefix}\n\n{TRUNCATION_NOTICE}" if prefix else TRUNCATION_NOTICE
+        candidate = build(candidate_body)
+        if _card_size(candidate) < CARD_MAX_BYTES:
+            best = candidate
+            low = middle + 1
+        else:
+            high = middle - 1
+    return best
+
+
+def _to_lark_md(content: str) -> str:
+    lines: list[str] = []
+    for raw_line in (content or "").splitlines():
+        line = raw_line.rstrip()
+        heading = re.match(r"^#{1,6}\s+(.+)$", line)
+        if heading:
+            lines.append(f"**{heading.group(1).strip()}**")
+            continue
+
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if len(cells) > 1:
+            compact_cells = [cell.replace(" ", "") for cell in cells]
+            if all(re.fullmatch(r":?-{3,}:?", cell) for cell in compact_cells):
+                continue
+            lines.append(f"- {' / '.join(cells)}")
+            continue
+        lines.append(line)
+    return "\n".join(lines).strip()
+
+
+def _card_size(card: dict[str, Any]) -> int:
+    return len(json.dumps(card, ensure_ascii=False).encode("utf-8"))
 
 
 def _json_body(response: httpx.Response) -> dict[str, Any]:

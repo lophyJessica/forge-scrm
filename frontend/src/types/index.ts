@@ -376,7 +376,7 @@ export type ReportType = '运营数据报告' | '市场分析周报'
 export type ReportGenerationStatus = '待生成' | '生成中' | '已完成' | '失败'
 export type ReportReviewStatus = '默认通过' | '抽查中' | '已确认' | '待审核' | '已废弃'
 export type ReportPushChannel = '飞书' | '微信'
-export type ReportPushStatus = '待推送' | '推送中' | '已推送' | '失败'
+export type ReportPushStatus = '待推送' | '推送中' | '已推送' | '失败' | '已取消'
 
 export interface ReportOut {
   id: number

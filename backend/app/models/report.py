@@ -61,6 +61,7 @@ class ReportPushStatus(StrEnum):
     推送中 = "推送中"
     已推送 = "已推送"
     失败 = "失败"
+    已取消 = "已取消"
 
 
 def _updated_at_column():
@@ -196,7 +197,7 @@ class ReportPushTask(Base):
         enum_type(ReportPushStatus, "report_push_status"),
         nullable=False,
         default=ReportPushStatus.待推送,
-        comment="待推送/推送中/已推送/失败；状态新增建议，待确认",
+        comment="待推送/推送中/已推送/失败/已取消；状态新增建议，待确认",
     )
     retry_count: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, comment="任务重试次数；新增建议，待确认"
@@ -247,7 +248,7 @@ class ReportPushRecord(Base):
         enum_type(ReportPushStatus, "report_push_record_status"),
         nullable=False,
         default=ReportPushStatus.待推送,
-        comment="待推送/推送中/已推送/失败；新增建议，待确认",
+        comment="待推送/推送中/已推送/失败/已取消；新增建议，待确认",
     )
     provider_message_id: Mapped[str | None] = mapped_column(
         String(255), nullable=True, comment="渠道返回消息 ID；新增建议，待确认"

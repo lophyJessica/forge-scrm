@@ -33,6 +33,7 @@ export default function ReportDetail() {
   const [pushDrawerOpen, setPushDrawerOpen] = useState(false)
   const [createPushOpen, setCreatePushOpen] = useState(false)
   const [pushing, setPushing] = useState<number | null>(null)
+  const [cancelling, setCancelling] = useState<number | null>(null)
 
   const load = async (reportId: string) => {
     const [reportResponse, pushResponse, configResponse] = await Promise.all([
@@ -99,6 +100,41 @@ export default function ReportDetail() {
       setPushing(null)
       await loadPushTasks(id)
     }
+  }
+
+  const cancelPush = async (taskId: number) => {
+    if (!id) return
+    setCancelling(taskId)
+    try {
+      await http.post(`/reports/push-tasks/${taskId}/cancel`)
+      message.success('推送任务已取消')
+    } catch {
+      // 全局请求拦截器展示后端错误。
+    } finally {
+      setCancelling(null)
+      await loadPushTasks(id)
+    }
+  }
+
+  const deletePush = (taskId: number) => {
+    if (!id) return
+    Modal.confirm({
+      title: '确认删除该推送任务？',
+      content: '删除后不可恢复（已推送的飞书消息不会撤回）',
+      okText: '删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await http.delete(`/reports/push-tasks/${taskId}`)
+          message.success('推送任务已删除')
+        } catch {
+          // 全局请求拦截器展示后端错误。
+        } finally {
+          await loadPushTasks(id)
+        }
+      },
+    })
   }
 
   if (loading) return <Card><Skeleton active /></Card>
@@ -191,18 +227,36 @@ export default function ReportDetail() {
           locale={{ emptyText: '暂无推送任务。已完成报告可创建飞书推送，创建后点发送即推送给接收人。' }}
           renderItem={(task) => {
             const error = latestPushError(task)
+            const canSend = task.status === '待推送' || task.status === '失败'
+            const canDelete = task.status === '已推送' || task.status === '已取消'
             return (
               <List.Item
                 actions={[
-                  task.status !== '已推送' ? (
+                  canSend ? (
                     <Button
                       key="send"
                       size="small"
-                      disabled={task.status === '推送中'}
+                      disabled={cancelling === task.id}
                       loading={pushing === task.id}
                       onClick={() => executePush(task.id)}
                     >
                       发送
+                    </Button>
+                  ) : null,
+                  canSend ? (
+                    <Button
+                      key="cancel"
+                      size="small"
+                      disabled={pushing === task.id}
+                      loading={cancelling === task.id}
+                      onClick={() => cancelPush(task.id)}
+                    >
+                      取消
+                    </Button>
+                  ) : null,
+                  canDelete ? (
+                    <Button key="delete" size="small" danger onClick={() => deletePush(task.id)}>
+                      删除
                     </Button>
                   ) : null,
                 ]}
@@ -211,7 +265,7 @@ export default function ReportDetail() {
                   title={`${task.task_no} · ${task.channel} / ${task.target_object}`}
                   description={(
                     <Space wrap>
-                      <Tag color={statusTagColor(task.status)}>{task.status}</Tag>
+                      <Tag color={task.status === '已取消' ? 'default' : statusTagColor(task.status)}>{task.status}</Tag>
                       <Typography.Text type="secondary">重试 {task.retry_count}</Typography.Text>
                       {error && <Typography.Text type="danger">{error}</Typography.Text>}
                     </Space>

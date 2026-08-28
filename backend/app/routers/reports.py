@@ -21,7 +21,7 @@ from app.models.report import (
     ReportReviewStatus,
     ReportType,
 )
-from app.schemas.common import PageResult
+from app.schemas.common import OkResult, PageResult
 from app.schemas.report import (
     ReportCreate,
     ReportOut,
@@ -229,6 +229,42 @@ def get_push_task(task_id: int, _: CurrentUser, db: DbSession) -> ReportPushTask
 
 
 @router.post(
+    "/reports/push-tasks/{task_id}/cancel",
+    response_model=ReportPushTaskOut,
+    summary="取消推送任务",
+)
+def cancel_push_task(task_id: int, _: CurrentUser, db: DbSession) -> ReportPushTaskOut:
+    task = db.scalar(
+        select(ReportPushTask).options(selectinload(ReportPushTask.records)).where(ReportPushTask.id == task_id)
+    )
+    if not task:
+        raise not_found("推送任务")
+    if task.status not in {ReportPushStatus.待推送, ReportPushStatus.失败}:
+        raise BizError("仅待推送或失败任务可取消")
+    task.status = ReportPushStatus.已取消
+    db.commit()
+    return _push_out(task)
+
+
+@router.delete(
+    "/reports/push-tasks/{task_id}",
+    response_model=OkResult,
+    summary="删除推送任务",
+)
+def delete_push_task(task_id: int, _: CurrentUser, db: DbSession) -> OkResult:
+    task = db.scalar(
+        select(ReportPushTask).options(selectinload(ReportPushTask.records)).where(ReportPushTask.id == task_id)
+    )
+    if not task:
+        raise not_found("推送任务")
+    if task.status == ReportPushStatus.推送中:
+        raise BizError("推送执行中，请稍后再试")
+    db.delete(task)
+    db.commit()
+    return OkResult(message="推送任务已删除")
+
+
+@router.post(
     "/push-tasks/{task_id}/execute",
     response_model=ReportPushTaskOut,
     summary="执行飞书推送",
@@ -243,6 +279,8 @@ def execute_push_task(task_id: int, _: CurrentUser, db: DbSession) -> ReportPush
         raise BizError("已推送任务不可重复发送", code=409)
     if task.status == ReportPushStatus.推送中:
         raise BizError("推送任务执行中，禁止重复触发", code=409)
+    if task.status == ReportPushStatus.已取消:
+        raise BizError("已取消任务不可发送", code=409)
 
     if task.channel != ReportPushChannel.飞书:
         task.status = ReportPushStatus.待推送
@@ -279,6 +317,8 @@ def execute_push_task(task_id: int, _: CurrentUser, db: DbSession) -> ReportPush
             title,
             report.generated_at,
             digest,
+            report.content,
+            _report_overview(report),
         )
         response_data = _response_data(response_summary)
         provider_code = response_data.get("code")
@@ -310,6 +350,18 @@ def execute_push_task(task_id: int, _: CurrentUser, db: DbSession) -> ReportPush
         .execution_options(populate_existing=True)
     )
     return _push_out(refreshed or task)
+
+
+def _report_overview(report: Report) -> str:
+    parts = [
+        f"报告类型：{report.report_type.value}",
+        f"报告周期：{report.period_start.strftime('%Y-%m-%d')} 至 {report.period_end.strftime('%Y-%m-%d')}",
+    ]
+    snapshot = report.source_snapshot if isinstance(report.source_snapshot, dict) else {}
+    sources = snapshot.get("sources")
+    if isinstance(sources, list):
+        parts.append(f"来源数量：{len(sources)}")
+    return " ｜ ".join(parts)
 
 
 def _message_summary(task: ReportPushTask) -> str:
