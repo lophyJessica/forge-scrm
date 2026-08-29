@@ -73,7 +73,7 @@ def list_benchmark_accounts(
         )
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     rows = db.scalars(
-        stmt.order_by(BenchmarkAccount.id.desc())
+        stmt.order_by(BenchmarkAccount.created_at.desc(), BenchmarkAccount.id.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)
     ).all()
@@ -171,7 +171,7 @@ def list_collection_tasks(
         stmt = stmt.where(CollectionTask.status == status)
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     rows = db.scalars(
-        stmt.order_by(CollectionTask.id.desc()).offset((page - 1) * page_size).limit(page_size)
+        stmt.order_by(CollectionTask.created_at.desc(), CollectionTask.id.desc()).offset((page - 1) * page_size).limit(page_size)
     ).all()
     return PageResult(
         total=total,
@@ -341,7 +341,7 @@ def list_collection_results(
         stmt = stmt.where(CollectionResult.benchmark_account_id == benchmark_account_id)
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     rows = db.scalars(
-        stmt.order_by(CollectionResult.id.desc()).offset((page - 1) * page_size).limit(page_size)
+        stmt.order_by(CollectionResult.created_at.desc(), CollectionResult.id.desc()).offset((page - 1) * page_size).limit(page_size)
     ).all()
     return PageResult(
         total=total,
@@ -370,7 +370,7 @@ def list_research_tasks(
         stmt = stmt.where(ResearchTask.status == status)
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     rows = db.scalars(
-        stmt.order_by(ResearchTask.id.desc()).offset((page - 1) * page_size).limit(page_size)
+        stmt.order_by(ResearchTask.created_at.desc(), ResearchTask.id.desc()).offset((page - 1) * page_size).limit(page_size)
     ).all()
     return PageResult(
         total=total,
@@ -530,7 +530,7 @@ def list_research_references(
         stmt = stmt.where(ResearchReference.report_id == report_id)
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     rows = db.scalars(
-        stmt.order_by(ResearchReference.id.desc()).offset((page - 1) * page_size).limit(page_size)
+        stmt.order_by(ResearchReference.created_at.desc(), ResearchReference.id.desc()).offset((page - 1) * page_size).limit(page_size)
     ).all()
     return PageResult(
         total=total,

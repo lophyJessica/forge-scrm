@@ -11,6 +11,25 @@ function pretty(value: Record<string, unknown> | null | undefined) {
   return value ? JSON.stringify(value, null, 2) : '—'
 }
 
+function isExternalUrl(value?: string | null) {
+  if (!value) return false
+  try {
+    const url = new URL(value)
+    return url.protocol === 'http:' || url.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+function snapshotText(value?: string | null) {
+  if (!value) return ''
+  try {
+    return JSON.stringify(JSON.parse(value), null, 2)
+  } catch {
+    return value
+  }
+}
+
 async function loadReport(taskOrReportId: string) {
   try {
     return (await http.get<ResearchReportOut>(`/research-tasks/${taskOrReportId}/report`)).data
@@ -85,12 +104,34 @@ export default function ResearchReport() {
           renderItem={(reference) => (
             <List.Item>
               <List.Item.Meta
-                title={reference.source_url ? <a href={reference.source_url} target="_blank" rel="noreferrer">{reference.source_title || reference.source_url}</a> : reference.source_title || '未命名来源'}
+                title={(() => {
+                  const title = reference.source_title || reference.source_url || '未命名来源'
+                  if (reference.source_kind === 'external_url' && isExternalUrl(reference.source_url)) {
+                    return <a href={reference.source_url!} target="_blank" rel="noreferrer">{title}</a>
+                  }
+                  if (reference.collection_result_id != null) {
+                    const href = `/collection/tasks?result_id=${reference.collection_result_id}`
+                    return <a href={href} onClick={(event) => { event.preventDefault(); navigate(href) }}>采集结果 #{reference.collection_result_id} · {title}</a>
+                  }
+                  if (reference.material_id != null) {
+                    const href = `/materials/${reference.material_id}`
+                    return <a href={href} onClick={(event) => { event.preventDefault(); navigate(href) }}>资料 #{reference.material_id} · {title}</a>
+                  }
+                  return <Typography.Text>{title}</Typography.Text>
+                })()}
                 description={(
-                  <Space wrap>
-                    {reference.search_provider && <Tag>{reference.search_provider}</Tag>}
-                    {reference.source_type && <Tag>{reference.source_type}</Tag>}
-                    {reference.evidence_summary && <Typography.Text type="secondary">{reference.evidence_summary}</Typography.Text>}
+                  <Space direction="vertical" size={8} style={{ display: 'flex' }}>
+                    <Space wrap>
+                      {reference.search_provider && <Tag>{reference.search_provider}</Tag>}
+                      {reference.source_type && <Tag>{reference.source_type}</Tag>}
+                      {reference.evidence_summary && <Typography.Text type="secondary">{reference.evidence_summary}</Typography.Text>}
+                    </Space>
+                    {reference.source_snapshot && (
+                      <details>
+                        <summary>历史快照</summary>
+                        <pre className="pre-wrap" style={{ margin: '8px 0 0' }}>{snapshotText(reference.source_snapshot)}</pre>
+                      </details>
+                    )}
                   </Space>
                 )}
               />

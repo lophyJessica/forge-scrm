@@ -41,7 +41,7 @@ def list_templates(
 
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     rows = db.scalars(
-        stmt.order_by(PromptTemplate.id.desc()).offset((page - 1) * page_size).limit(page_size)
+        stmt.order_by(PromptTemplate.created_at.desc(), PromptTemplate.id.desc()).offset((page - 1) * page_size).limit(page_size)
     ).all()
     return PageResult[PromptTemplateOut](
         total=total,

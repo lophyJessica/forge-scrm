@@ -98,7 +98,7 @@ def list_reports(
         stmt = stmt.where(Report.generation_status == generation_status)
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     rows = db.scalars(
-        stmt.order_by(Report.id.desc()).offset((page - 1) * page_size).limit(page_size)
+        stmt.order_by(Report.generated_at.desc(), Report.id.desc()).offset((page - 1) * page_size).limit(page_size)
     ).all()
     return PageResult(
         total=total,
@@ -205,7 +205,7 @@ def list_report_push_tasks(
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     rows = db.scalars(
         stmt.options(selectinload(ReportPushTask.records))
-        .order_by(ReportPushTask.id.desc())
+        .order_by(ReportPushTask.created_at.desc(), ReportPushTask.id.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)
     ).all()

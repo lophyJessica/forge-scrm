@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Alert, Badge, Button, Card, Descriptions, Divider, Drawer, Form, Input, List, Modal, Skeleton, Space, Tag, Tooltip, Typography, message } from 'antd'
+import { Alert, Badge, Button, Card, Collapse, Descriptions, Divider, Drawer, Form, Input, List, Modal, Skeleton, Space, Table, Tag, Tooltip, Typography, message, type TableColumnsType } from 'antd'
 import { http } from '@/api/client'
 import { statusTagColor } from '@/theme'
-import type { PageResult, ReportOut, ReportPushTaskOut } from '@/types'
+import type { PageResult, ReportOut, ReportPushRecordOut, ReportPushTaskOut } from '@/types'
 
 function pretty(value: Record<string, unknown> | null | undefined) {
   return value ? JSON.stringify(value, null, 2) : '—'
@@ -11,6 +11,15 @@ function pretty(value: Record<string, unknown> | null | undefined) {
 
 function formatTime(value?: string | null) {
   return value ? value.replace('T', ' ').slice(0, 19) : '—'
+}
+
+function maskPushTarget(value?: string | null) {
+  if (!value) return '—'
+  if (value.includes('****')) return value
+  if (value.length <= 4) return '*'.repeat(value.length)
+  const headLength = value.startsWith('ou_') ? 6 : 2
+  const tailLength = value.length > 8 ? 4 : 2
+  return `${value.slice(0, headLength)}****${value.slice(-tailLength)}`
 }
 
 type SourceItem = { type?: string; id?: number; [key: string]: unknown }
@@ -21,6 +30,58 @@ const PUSH_CONFIG_ERROR = '未配置飞书推送，请联系管理员设置 FEIS
 function latestPushError(task: ReportPushTaskOut) {
   return [...(task.records || [])].reverse().find((record) => record.status === '失败')?.error_message
 }
+
+const PUSH_RECORD_COLUMNS: TableColumnsType<ReportPushRecordOut> = [
+  {
+    title: '脱敏目标',
+    dataIndex: 'target_object',
+    width: 150,
+    ellipsis: true,
+    render: (value: string) => <Tooltip title={maskPushTarget(value)}>{maskPushTarget(value)}</Tooltip>,
+  },
+  {
+    title: '消息摘要',
+    dataIndex: 'message_summary',
+    width: 220,
+    ellipsis: true,
+    render: (value: string) => <Tooltip title={value}>{value || '—'}</Tooltip>,
+  },
+  {
+    title: '发送时间',
+    dataIndex: 'sent_at',
+    width: 160,
+    render: (value?: string | null) => formatTime(value),
+  },
+  {
+    title: '状态',
+    dataIndex: 'status',
+    width: 90,
+    render: (value: string) => <Tag color={statusTagColor(value)}>{value}</Tag>,
+  },
+  {
+    title: '错误码 / 原因',
+    width: 220,
+    render: (_, record) => (
+      <Space direction="vertical" size={4}>
+        <Typography.Text code>{record.error_code || '—'}</Typography.Text>
+        <Tooltip title={record.error_message}>
+          <Typography.Text
+            ellipsis
+            style={{ maxWidth: 200 }}
+            type={record.error_message ? 'danger' : 'secondary'}
+          >
+            {record.error_message || '—'}
+          </Typography.Text>
+        </Tooltip>
+      </Space>
+    ),
+  },
+  {
+    title: '尝试序号',
+    dataIndex: 'attempt_no',
+    width: 90,
+  },
+]
 
 export default function ReportDetail() {
   const { id } = useParams<{ id: string }>()
@@ -184,18 +245,16 @@ export default function ReportDetail() {
           <Typography.Title level={3} style={{ margin: 0 }}>{report.title}</Typography.Title>
           {report.is_ai_product && <Tag color="purple">AI 生成</Tag>}
           <Tag color={statusTagColor(report.generation_status)}>{report.generation_status}</Tag>
-          <Tag color={statusTagColor(report.review_status)}>{report.review_status}</Tag>
         </Space>
-        <Descriptions column={{ xs: 1, sm: 3 }} size="small" style={{ marginTop: 18 }}>
+        <Descriptions column={{ xs: 1, sm: 3 }} size="small" style={{ marginTop: 16 }}>
           <Descriptions.Item label="编号">{report.report_no}</Descriptions.Item>
           <Descriptions.Item label="类型">{report.report_type}</Descriptions.Item>
           <Descriptions.Item label="周期">{formatTime(report.period_start)} ~ {formatTime(report.period_end)}</Descriptions.Item>
           <Descriptions.Item label="生成时间">{formatTime(report.generated_at)}</Descriptions.Item>
           <Descriptions.Item label="重试次数">{report.retry_count}</Descriptions.Item>
-          <Descriptions.Item label="审核状态">{report.review_status}</Descriptions.Item>
         </Descriptions>
         {report.error_message && (
-          <Alert type="error" showIcon style={{ marginTop: 12 }} message={report.error_code || '生成失败'} description={report.error_message} />
+          <Alert type="error" showIcon style={{ marginTop: 16 }} message={report.error_code || '生成失败'} description={report.error_message} />
         )}
         <Divider />
         <Typography.Title level={4}>摘要</Typography.Title>
@@ -231,7 +290,9 @@ export default function ReportDetail() {
 
       <Drawer
         open={pushDrawerOpen}
-        width={480}
+        width={720}
+        style={{ maxWidth: '100vw' }}
+        styles={{ body: { padding: 16 } }}
         title="推送任务"
         onClose={() => setPushDrawerOpen(false)}
         extra={report.generation_status === '已完成' ? (
@@ -282,10 +343,30 @@ export default function ReportDetail() {
                 <List.Item.Meta
                   title={`${task.task_no} · ${task.channel} / ${task.target_object}`}
                   description={(
-                    <Space wrap>
-                      <Tag color={task.status === '已取消' ? 'default' : statusTagColor(task.status)}>{task.status}</Tag>
-                      <Typography.Text type="secondary">重试 {task.retry_count}</Typography.Text>
-                      {error && <Typography.Text type="danger">{error}</Typography.Text>}
+                    <Space direction="vertical" size={8} style={{ display: 'flex', width: '100%' }}>
+                      <Space wrap>
+                        <Tag color={statusTagColor(task.status)}>{task.status}</Tag>
+                        <Typography.Text type="secondary">重试 {task.retry_count}</Typography.Text>
+                        {error && <Typography.Text type="danger">{error}</Typography.Text>}
+                      </Space>
+                      <Collapse
+                        ghost
+                        items={[{
+                          key: 'records',
+                          label: `发送记录（${task.records?.length || 0}）`,
+                          children: (
+                            <Table<ReportPushRecordOut>
+                              size="small"
+                              rowKey="id"
+                              dataSource={task.records || []}
+                              pagination={false}
+                              scroll={{ x: 930 }}
+                              locale={{ emptyText: '暂无发送记录' }}
+                              columns={PUSH_RECORD_COLUMNS}
+                            />
+                          ),
+                        }]}
+                      />
                     </Space>
                   )}
                 />

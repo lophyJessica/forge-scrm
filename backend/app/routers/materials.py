@@ -63,7 +63,7 @@ MATERIAL_CSV_REQUIRED = ["标题", "内容", "分类", "来源类型", "可信�
 
 @router.get("/material-classes", response_model=list[MaterialClassOut], summary="资料分类列表")
 def list_classes(current_user: CurrentUser, db: DbSession) -> list[MaterialClassOut]:
-    stmt = select(MaterialClass).order_by(MaterialClass.sort, MaterialClass.id)
+    stmt = select(MaterialClass).order_by(MaterialClass.created_at.desc(), MaterialClass.id.desc())
     allowed = allowed_material_class_ids(current_user)
     if allowed is not None:
         stmt = stmt.where(MaterialClass.id.in_(allowed or [-1]))
@@ -117,7 +117,7 @@ def delete_class(class_id: int, _: AdminUser, db: DbSession) -> OkResult:
 def list_tags(
     current_user: CurrentUser, db: DbSession, keyword: str | None = None
 ) -> list[TagOut]:
-    stmt = select(Tag).order_by(Tag.id.desc())
+    stmt = select(Tag).order_by(Tag.created_at.desc(), Tag.id.desc())
     if keyword:
         stmt = stmt.where(Tag.name.like(f"%{keyword}%"))
     return [TagOut.model_validate(t) for t in db.scalars(stmt).all()]
@@ -274,7 +274,7 @@ def combo_preview(
         stmt = (
             select(Material)
             .where(Material.class_id == klass.id, Material.status == MaterialStatus.已生效)
-            .order_by(Material.id.desc())
+            .order_by(Material.created_at.desc(), Material.id.desc())
             .limit(payload.limit_per_class)
         )
         rows = list(db.scalars(stmt).all())
@@ -326,7 +326,7 @@ def list_materials(
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     rows = list(
         db.scalars(
-            stmt.order_by(Material.id.desc()).offset((page - 1) * page_size).limit(page_size)
+            stmt.order_by(Material.created_at.desc(), Material.id.desc()).offset((page - 1) * page_size).limit(page_size)
         ).all()
     )
     svc.apply_lazy_expiry(db, rows)

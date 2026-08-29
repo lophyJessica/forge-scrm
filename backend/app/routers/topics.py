@@ -113,7 +113,7 @@ def list_batches(_: CurrentUser, db: DbSession) -> list[TopicBatchOut]:
         )
         .where(Topic.batch_no.is_not(None))
         .group_by(Topic.batch_no, Topic.direction)
-        .order_by(func.min(Topic.created_at).desc())
+        .order_by(func.min(Topic.created_at).desc(), func.max(Topic.id).desc())
     )
     return [
         TopicBatchOut(
@@ -153,7 +153,7 @@ def list_topics(
 
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     rows = db.scalars(
-        stmt.order_by(Topic.id.desc()).offset((page - 1) * page_size).limit(page_size)
+        stmt.order_by(Topic.created_at.desc(), Topic.id.desc()).offset((page - 1) * page_size).limit(page_size)
     ).all()
     return PageResult[TopicOut](
         total=total, page=page, page_size=page_size, items=[svc.to_out(db, r) for r in rows]

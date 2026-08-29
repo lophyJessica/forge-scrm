@@ -31,6 +31,7 @@ import AdminPromptTemplates from '@/pages/admin/PromptTemplates'
 import BenchmarkAccounts from '@/pages/collection/BenchmarkAccounts'
 import CollectionTasks from '@/pages/collection/CollectionTasks'
 import ResearchTasks from '@/pages/research/ResearchTasks'
+import ResearchTaskDetail from '@/pages/research/ResearchTaskDetail'
 import ResearchReport from '@/pages/research/ResearchReport'
 import ReportList from '@/pages/reports/ReportList'
 import ReportDetail from '@/pages/reports/ReportDetail'
@@ -101,6 +102,7 @@ export default function App() {
 
         {/* 模块 07 研究助手 */}
         <Route path="/research/tasks" element={<ResearchTasks />} />
+        <Route path="/research/tasks/:id" element={<ResearchTaskDetail />} />
         <Route path="/research/reports/:id" element={<ResearchReport />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

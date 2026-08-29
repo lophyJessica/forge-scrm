@@ -361,7 +361,7 @@ def list_tasks(
         stmt = stmt.where(AnalysisTask.status == status)
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     rows = db.scalars(
-        stmt.order_by(AnalysisTask.id.desc()).offset((page - 1) * page_size).limit(page_size)
+        stmt.order_by(AnalysisTask.created_at.desc(), AnalysisTask.id.desc()).offset((page - 1) * page_size).limit(page_size)
     ).all()
     return PageResult[AnalysisTaskOut](
         total=total, page=page, page_size=page_size, items=[svc.task_to_out(db, r) for r in rows]

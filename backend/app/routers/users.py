@@ -47,7 +47,7 @@ def list_users(
 
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     rows = db.scalars(
-        stmt.order_by(User.id.desc()).offset((page - 1) * page_size).limit(page_size)
+        stmt.order_by(User.created_at.desc(), User.id.desc()).offset((page - 1) * page_size).limit(page_size)
     ).all()
     return PageResult[UserOut](
         total=total,

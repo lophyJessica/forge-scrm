@@ -138,6 +138,7 @@ export default function ResearchTasks() {
             fixed: 'right',
             render: (_, row) => (
               <Space size={8}>
+                <Button size="small" onClick={() => navigate(`/research/tasks/${row.id}`)}>详情</Button>
                 {['pending', 'failed'].includes(row.status) && (
                   <Button size="small" type="primary" loading={running === row.id} onClick={() => execute(row)}>
                     {row.status === 'failed' ? '重试' : '执行'}

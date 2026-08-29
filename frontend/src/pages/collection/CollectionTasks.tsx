@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { isAxiosError } from 'axios'
 import { type Dayjs } from 'dayjs'
-import { Button, Card, DatePicker, Form, Input, Modal, Select, Space, Spin, Table, Tabs, Tag, Typography, message } from 'antd'
+import { useSearchParams } from 'react-router-dom'
+import { Button, Card, DatePicker, Descriptions, Divider, Drawer, Form, Input, Modal, Select, Space, Spin, Table, Tabs, Tag, Typography, message } from 'antd'
 import { http } from '@/api/client'
 import { TABLE_EMPTY } from '@/components/tableEmpty'
 import { TABLE_PAGINATION, statusTagColor } from '@/theme'
@@ -21,6 +22,15 @@ function formatTime(value?: string | null) {
   return value ? value.replace('T', ' ').slice(0, 19) : '—'
 }
 
+function formatJson(value: unknown) {
+  if (value == null) return '—'
+  try {
+    return JSON.stringify(value, null, 2)
+  } catch {
+    return String(value)
+  }
+}
+
 async function loadNestedOrFlat<T>(nestedPath: string, flatPath: string, params: Record<string, number>) {
   try {
     const response = await http.get<PageResult<T>>(nestedPath)
@@ -32,7 +42,37 @@ async function loadNestedOrFlat<T>(nestedPath: string, flatPath: string, params:
   }
 }
 
-function TaskDetails({ taskId }: { taskId: number }) {
+function ResultDetail({ result }: { result: CollectionResultOut }) {
+  return (
+    <Space direction="vertical" size={16} style={{ display: 'flex' }}>
+      <Descriptions column={1} size="small" bordered>
+        <Descriptions.Item label="结果 ID">{result.id}</Descriptions.Item>
+        <Descriptions.Item label="记录 ID">{result.record_id}</Descriptions.Item>
+        <Descriptions.Item label="任务 ID">{result.task_id}</Descriptions.Item>
+        <Descriptions.Item label="业务对象">{result.business_object || '—'}</Descriptions.Item>
+        <Descriptions.Item label="平台">{result.platform || '—'}</Descriptions.Item>
+        <Descriptions.Item label="账号标识">{result.account_identifier || '—'}</Descriptions.Item>
+        <Descriptions.Item label="采集时间">{formatTime(result.collected_at)}</Descriptions.Item>
+        <Descriptions.Item label="时间窗">{formatTime(result.window_start)} ~ {formatTime(result.window_end)}</Descriptions.Item>
+        <Descriptions.Item label="AI 产物">{result.is_ai_product ? '是' : '否'}</Descriptions.Item>
+        <Descriptions.Item label="来源链接">
+          {result.source_url ? <a href={result.source_url} target="_blank" rel="noreferrer">{result.source_url}</a> : '—'}
+        </Descriptions.Item>
+      </Descriptions>
+      <div>
+        <Typography.Title level={5} style={{ marginTop: 0 }}>结构化数据</Typography.Title>
+        <pre className="pre-wrap" style={{ margin: 0 }}>{formatJson(result.structured_data)}</pre>
+      </div>
+      <Divider style={{ margin: 0 }} />
+      <div>
+        <Typography.Title level={5} style={{ marginTop: 0 }}>原始内容</Typography.Title>
+        <Typography.Paragraph className="pre-wrap" style={{ marginBottom: 0 }}>{result.raw_content || '—'}</Typography.Paragraph>
+      </div>
+    </Space>
+  )
+}
+
+function TaskDetails({ taskId, onOpenResult }: { taskId: number; onOpenResult: (result: CollectionResultOut) => void }) {
   const [records, setRecords] = useState<CollectionRecordOut[]>([])
   const [results, setResults] = useState<CollectionResultOut[]>([])
   const [loading, setLoading] = useState(true)
@@ -98,6 +138,7 @@ function TaskDetails({ taskId }: { taskId: number }) {
                 { title: '原始内容', dataIndex: 'raw_content', ellipsis: true, render: (value: string) => <Typography.Text ellipsis={{ tooltip: value }}>{value}</Typography.Text> },
                 { title: 'AI 产物', dataIndex: 'is_ai_product', width: 90, render: (value: boolean) => value ? <Tag color="purple">是</Tag> : <Tag>否</Tag> },
                 { title: '采集时间', dataIndex: 'collected_at', width: 180, render: (value: string) => formatTime(value) },
+                { title: '操作', width: 80, fixed: 'right', render: (_, result) => <Button size="small" onClick={() => onOpenResult(result)}>详情</Button> },
               ]}
             />
           ),
@@ -108,6 +149,7 @@ function TaskDetails({ taskId }: { taskId: number }) {
 }
 
 export default function CollectionTasks() {
+  const [searchParams] = useSearchParams()
   const [queryForm] = Form.useForm()
   const [form] = Form.useForm()
   const [rows, setRows] = useState<CollectionTaskOut[]>([])
@@ -117,6 +159,7 @@ export default function CollectionTasks() {
   const [loading, setLoading] = useState(false)
   const [running, setRunning] = useState<number | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [resultDetail, setResultDetail] = useState<CollectionResultOut | null>(null)
 
   const load = useCallback(async (targetPage = 1) => {
     setLoading(true)
@@ -136,6 +179,25 @@ export default function CollectionTasks() {
     void load(1)
     void http.get<PageResult<BenchmarkAccountOut>>('/benchmark-accounts', { params: { enabled: true, page_size: 200 } }).then((response) => setAccounts(response.data.items))
   }, [load])
+
+  useEffect(() => {
+    const rawResultId = searchParams.get('result_id')
+    if (!rawResultId) return
+    const resultId = Number(rawResultId)
+    if (!Number.isInteger(resultId) || resultId < 1) {
+      message.warning('采集结果编号无效')
+      return
+    }
+    let active = true
+    http.get<PageResult<CollectionResultOut>>('/collection-results', { params: { page: 1, page_size: 200 } })
+      .then(({ data }) => {
+        if (!active) return
+        const result = data.items.find((item) => item.id === resultId)
+        if (result) setResultDetail(result)
+        else message.warning('采集结果不存在或已不可见')
+      })
+    return () => { active = false }
+  }, [searchParams])
 
   const openModal = () => {
     form.resetFields()
@@ -201,7 +263,7 @@ export default function CollectionTasks() {
         rowKey="id"
         loading={loading}
         dataSource={rows}
-        expandable={{ expandedRowRender: (row) => <TaskDetails taskId={row.id} /> }}
+        expandable={{ expandedRowRender: (row) => <TaskDetails taskId={row.id} onOpenResult={setResultDetail} /> }}
         pagination={{ ...TABLE_PAGINATION, current: page, total, pageSize: 20, onChange: (nextPage) => load(nextPage) }}
         scroll={{ x: 1050 }}
         columns={[
@@ -237,6 +299,16 @@ export default function CollectionTasks() {
           </Form.Item>
         </Form>
       </Modal>
+
+      <Drawer
+        open={!!resultDetail}
+        width={640}
+        title={resultDetail ? `采集结果 #${resultDetail.id}` : '采集结果详情'}
+        onClose={() => setResultDetail(null)}
+        destroyOnClose
+      >
+        {resultDetail && <ResultDetail result={resultDetail} />}
+      </Drawer>
     </Card>
   )
 }

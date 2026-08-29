@@ -55,6 +55,8 @@
 
 列表页建议骨架：
 
+列表默认排序：创建/生成时间倒序（回退修改时间倒序），后端 `order_by` 必须落实。
+
 ```tsx
 <Card title="页面标题" extra={<Button type="primary">主要操作</Button>}>
   <Form layout="inline" style={{ marginBottom: 16 }}>{/* 筛选区 */}</Form>
