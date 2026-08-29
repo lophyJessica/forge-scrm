@@ -308,7 +308,7 @@ def list_collection_records(
         stmt = stmt.where(CollectionRecord.status == status)
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     rows = db.scalars(
-        stmt.order_by(CollectionRecord.id.desc()).offset((page - 1) * page_size).limit(page_size)
+        stmt.order_by(CollectionRecord.requested_at.desc(), CollectionRecord.id.desc()).offset((page - 1) * page_size).limit(page_size)
     ).all()
     return PageResult(
         total=total,

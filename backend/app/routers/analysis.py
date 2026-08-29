@@ -272,7 +272,7 @@ def list_raw_data(
 
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     rows = db.scalars(
-        stmt.order_by(RawData.id.desc()).offset((page - 1) * page_size).limit(page_size)
+        stmt.order_by(RawData.collected_at.desc(), RawData.id.desc()).offset((page - 1) * page_size).limit(page_size)
     ).all()
     return PageResult[RawDataOut](
         total=total, page=page, page_size=page_size, items=[svc.raw_to_out(r) for r in rows]
