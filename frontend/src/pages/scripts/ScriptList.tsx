@@ -10,6 +10,8 @@ import type { PageResult, ScriptOut } from '@/types'
 
 export default function ScriptList() {
   const [form] = Form.useForm()
+  // Use a fresh object so this form always receives the inline style.
+  const filterCardStyle = { ...FILTER_CARD_STYLE }
   const navigate = useNavigate()
   const [search] = useSearchParams()
   const options = useMetaStore((s) => s.options)
@@ -62,7 +64,7 @@ export default function ScriptList() {
         </Space>
       }
     >
-      <Form form={form} layout="inline" style={FILTER_CARD_STYLE} onFinish={() => load(1)}>
+      <Form key="scripts-filter" form={form} layout="inline" style={filterCardStyle} onFinish={() => load(1)}>
         <Form.Item name="keyword">
           <Input allowClear placeholder="正文关键词" style={{ width: 200 }} />
         </Form.Item>
