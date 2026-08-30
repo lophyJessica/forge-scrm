@@ -1,7 +1,16 @@
 /** 全站视觉 token：对齐 copy-wms 紫色主色与状态语义。 */
+import type * as React from 'react'
 import type { ThemeConfig } from 'antd'
 
 export const PRIMARY_COLOR = '#7c3aed'
+
+export const FILTER_CARD_STYLE: React.CSSProperties = {
+  background: '#fafafa',
+  border: '1px solid #f0f0f0',
+  borderRadius: 8,
+  padding: 16,
+  marginBottom: 24,
+}
 
 export const appTheme: ThemeConfig = {
   token: {

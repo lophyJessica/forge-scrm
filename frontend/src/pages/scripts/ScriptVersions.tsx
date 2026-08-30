@@ -5,6 +5,7 @@ import { http } from '@/api/client'
 import { TABLE_EMPTY } from '@/components/tableEmpty'
 import { useAuthStore } from '@/store/auth'
 import { PERM } from '@/store/meta'
+import { FILTER_CARD_STYLE } from '@/theme'
 import type { ScriptDiffOut, ScriptVersionOut } from '@/types'
 
 export default function ScriptVersions() {
@@ -58,7 +59,7 @@ export default function ScriptVersions() {
       title={`脚本 #${id} 版本历史`}
       extra={<Button onClick={() => navigate(`/scripts/${id}`)}>返回脚本</Button>}
     >
-      <Space style={{ marginBottom: 24 }}>
+      <Space style={FILTER_CARD_STYLE}>
         <Select value={left} onChange={setLeft} options={opts} style={{ width: 110 }} placeholder="左版本" />
         <span>对比</span>
         <Select value={right} onChange={setRight} options={opts} style={{ width: 110 }} placeholder="右版本" />

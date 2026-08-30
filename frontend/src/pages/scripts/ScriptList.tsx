@@ -5,7 +5,7 @@ import { http } from '@/api/client'
 import { TABLE_EMPTY } from '@/components/tableEmpty'
 import { TableActions } from '@/components/TableActions'
 import { useMetaStore } from '@/store/meta'
-import { TABLE_PAGINATION, displayStatus, statusTagColor, visibleStatusOptions } from '@/theme'
+import { FILTER_CARD_STYLE, TABLE_PAGINATION, displayStatus, statusTagColor, visibleStatusOptions } from '@/theme'
 import type { PageResult, ScriptOut } from '@/types'
 
 export default function ScriptList() {
@@ -62,7 +62,7 @@ export default function ScriptList() {
         </Space>
       }
     >
-      <Form form={form} layout="inline" style={{ marginBottom: 24 }} onFinish={() => load(1)}>
+      <Form form={form} layout="inline" style={FILTER_CARD_STYLE} onFinish={() => load(1)}>
         <Form.Item name="keyword">
           <Input allowClear placeholder="正文关键词" style={{ width: 200 }} />
         </Form.Item>

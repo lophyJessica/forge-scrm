@@ -4,7 +4,7 @@ import { type Dayjs } from 'dayjs'
 import { Button, Card, DatePicker, Form, Input, Modal, Progress, Select, Space, Table, Tag, message } from 'antd'
 import { http } from '@/api/client'
 import { TABLE_EMPTY } from '@/components/tableEmpty'
-import { TABLE_PAGINATION, statusTagColor } from '@/theme'
+import { FILTER_CARD_STYLE, TABLE_PAGINATION, statusTagColor } from '@/theme'
 import type { PageResult, ResearchTaskOut } from '@/types'
 
 const { RangePicker } = DatePicker
@@ -94,7 +94,7 @@ export default function ResearchTasks() {
 
   return (
     <Card title="研究助手" extra={<Button type="primary" onClick={() => { form.resetFields(); setModalOpen(true) }}>新建研究任务</Button>}>
-      <Form form={queryForm} layout="inline" style={{ marginBottom: 24 }} onFinish={() => load(1)}>
+      <Form form={queryForm} layout="inline" style={FILTER_CARD_STYLE} onFinish={() => load(1)}>
         <Form.Item name="status">
           <Select allowClear placeholder="任务状态" style={{ width: 150 }} options={Object.keys(STATUS_LABEL).map((value) => ({ label: STATUS_LABEL[value], value }))} />
         </Form.Item>

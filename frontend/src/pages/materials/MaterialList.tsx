@@ -19,7 +19,7 @@ import { TABLE_EMPTY } from '@/components/tableEmpty'
 import { TableActions } from '@/components/TableActions'
 import { useAuthStore } from '@/store/auth'
 import { PERM, useMetaStore } from '@/store/meta'
-import { TABLE_PAGINATION, displayStatus, statusTagColor, visibleStatusOptions } from '@/theme'
+import { FILTER_CARD_STYLE, TABLE_PAGINATION, displayStatus, statusTagColor, visibleStatusOptions } from '@/theme'
 import type { MaterialClassOut, MaterialOut, PageResult, TagOut } from '@/types'
 
 export default function MaterialList() {
@@ -80,7 +80,7 @@ export default function MaterialList() {
         </Space>
       }
     >
-      <Form form={form} layout="inline" style={{ marginBottom: 24 }} onFinish={() => load(1)}>
+      <Form form={form} layout="inline" style={FILTER_CARD_STYLE} onFinish={() => load(1)}>
         <Form.Item name="keyword">
           <Input allowClear placeholder="标题/正文关键词" style={{ width: 220 }} />
         </Form.Item>

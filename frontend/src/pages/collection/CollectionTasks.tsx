@@ -5,7 +5,7 @@ import { useSearchParams } from 'react-router-dom'
 import { Button, Card, DatePicker, Descriptions, Divider, Drawer, Form, Input, Modal, Select, Space, Spin, Table, Tabs, Tag, Typography, message } from 'antd'
 import { http } from '@/api/client'
 import { TABLE_EMPTY } from '@/components/tableEmpty'
-import { TABLE_PAGINATION, statusTagColor } from '@/theme'
+import { FILTER_CARD_STYLE, TABLE_PAGINATION, statusTagColor } from '@/theme'
 import type { BenchmarkAccountOut, CollectionRecordOut, CollectionResultOut, CollectionTaskOut, PageResult } from '@/types'
 
 const { RangePicker } = DatePicker
@@ -246,7 +246,7 @@ export default function CollectionTasks() {
 
   return (
     <Card title="自动采集任务" extra={<Button type="primary" onClick={openModal}>新建采集任务</Button>}>
-      <Form form={queryForm} layout="inline" style={{ marginBottom: 24 }} onFinish={() => load(1)}>
+      <Form form={queryForm} layout="inline" style={FILTER_CARD_STYLE} onFinish={() => load(1)}>
         <Form.Item name="status">
           <Select allowClear placeholder="任务状态" style={{ width: 150 }} options={Object.keys(STATUS_LABEL).map((value) => ({ label: STATUS_LABEL[value], value }))} />
         </Form.Item>

@@ -5,7 +5,7 @@ import { Alert, Button, Card, DatePicker, Descriptions, Form, Modal, Select, Spa
 import { http } from '@/api/client'
 import { TABLE_EMPTY } from '@/components/tableEmpty'
 import { TableActions } from '@/components/TableActions'
-import { TABLE_PAGINATION, statusTagColor } from '@/theme'
+import { FILTER_CARD_STYLE, TABLE_PAGINATION, statusTagColor } from '@/theme'
 import type {
   AnalysisTaskOut,
   CollectionResultOut,
@@ -303,7 +303,7 @@ export default function ReportList() {
         </Button>
       )}
     >
-      <Form form={queryForm} layout="inline" style={{ marginBottom: 24 }} onFinish={() => load(1)}>
+      <Form form={queryForm} layout="inline" style={FILTER_CARD_STYLE} onFinish={() => load(1)}>
         <Form.Item name="report_type">
           <Select allowClear placeholder="报告类型" style={{ width: 180 }} options={REPORT_TYPES.map((value) => ({ label: value, value }))} />
         </Form.Item>

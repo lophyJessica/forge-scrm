@@ -6,7 +6,7 @@ import { TABLE_EMPTY } from '@/components/tableEmpty'
 import { TableActions } from '@/components/TableActions'
 import { useAuthStore } from '@/store/auth'
 import { PERM, useMetaStore } from '@/store/meta'
-import { TABLE_PAGINATION, displayStatus, statusTagColor, visibleStatusOptions } from '@/theme'
+import { FILTER_CARD_STYLE, TABLE_PAGINATION, displayStatus, statusTagColor, visibleStatusOptions } from '@/theme'
 import type { AnalysisTaskOut, MaterialOut, PageResult, PromptTemplateOut, RawDataOut } from '@/types'
 
 export default function AnalysisTasks() {
@@ -103,7 +103,7 @@ export default function AnalysisTasks() {
         style={{ marginBottom: 16 }}
         message="一期为同步执行：点击「执行」后请等待返回（AI 调用失败自动重试 3 次），不做异步队列与通知。"
       />
-      <Form form={queryForm} layout="inline" style={{ marginBottom: 24 }} onFinish={() => load(1)}>
+      <Form form={queryForm} layout="inline" style={FILTER_CARD_STYLE} onFinish={() => load(1)}>
         <Form.Item name="type">
           <Select allowClear placeholder="任务类型" style={{ width: 180 }} options={options('analysis_task_type')} />
         </Form.Item>
