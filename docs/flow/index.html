@@ -138,6 +138,12 @@
       border-radius: 8px;
       padding: 16px
     }
+
+    .doc-divider {
+      margin: 56px 0;
+      border: 0;
+      border-top: 1px solid rgba(255, 255, 255, .16)
+    }
   </style>
 </head>
 
@@ -146,13 +152,18 @@
   <script>
     mermaid.initialize({ startOnLoad: false, theme: 'dark', themeVariables: { primaryColor: '#1e3a5f', primaryTextColor: '#e2e8f0', primaryBorderColor: '#38bdf8', lineColor: '#64748b', secondaryColor: '#1e293b', tertiaryColor: '#0f172a' } });
 
-    fetch('flowchart.md?t=' + Date.now())
-      .then(response => {
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const markdownFiles = ['flowchart.md', '业务流程图.md'];
+
+    Promise.all(markdownFiles.map(file =>
+      fetch(`${file}?t=${Date.now()}`).then(response => {
+        if (!response.ok) throw new Error(`${file}: HTTP ${response.status}`);
         return response.text();
       })
-      .then(async md => {
-        document.getElementById('content').innerHTML = marked.parse(md);
+    ))
+      .then(async docs => {
+        document.getElementById('content').innerHTML = docs
+          .map(md => marked.parse(md))
+          .join('<hr class="doc-divider">');
 
         const mermaidNodes = document.querySelectorAll('.language-mermaid');
 
@@ -266,7 +277,7 @@
       })
       .catch(err => {
         console.error('Document render failed:', err);
-        document.getElementById('content').innerHTML = `<div class="load-error">无法加载 flowchart.md：${String(err)}</div>`;
+        document.getElementById('content').innerHTML = `<div class="load-error">无法加载流程文档：${String(err)}</div>`;
       });
   </script>
 </body>
