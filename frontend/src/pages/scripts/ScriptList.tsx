@@ -24,8 +24,9 @@ export default function ScriptList() {
     async (targetPage = 1) => {
       setLoading(true)
       try {
+        const { script_style, ...filters } = form.getFieldsValue()
         const { data } = await http.get<PageResult<ScriptOut>>('/scripts', {
-          params: { ...form.getFieldsValue(), page: targetPage, page_size: 20 },
+          params: { ...filters, style: script_style, page: targetPage, page_size: 20 },
         })
         setRows(data.items)
         setTotal(data.total)
@@ -71,7 +72,8 @@ export default function ScriptList() {
         <Form.Item name="topic_id">
           <Input allowClear placeholder="选题 ID" style={{ width: 120 }} />
         </Form.Item>
-        <Form.Item name="style">
+        {/* Keep the field name off "style" so it cannot shadow HTMLFormElement.style. */}
+        <Form.Item name="script_style">
           <Select allowClear placeholder="语言风格" style={{ width: 140 }} options={options('script_style')} />
         </Form.Item>
         <Form.Item name="status">
