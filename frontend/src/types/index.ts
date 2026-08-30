@@ -198,6 +198,7 @@ export interface AnalysisTaskOut {
   created_at: string
   retry_count?: number | null
   raw_data_ids: number[]
+  collection_result_ids: number[]
   results: AnalysisResultOut[]
 }
 
@@ -377,6 +378,18 @@ export type ReportGenerationStatus = '待生成' | '生成中' | '已完成' | '
 export type ReportReviewStatus = '默认通过' | '抽查中' | '已确认' | '待审核' | '已废弃'
 export type ReportPushChannel = '飞书' | '微信'
 export type ReportPushStatus = '待推送' | '推送中' | '已推送' | '失败' | '已取消'
+
+export interface ReportTemplateOut {
+  id: number
+  report_type: ReportType
+  name: string
+  content_schema: Record<string, unknown>
+  is_default: boolean
+  status: '启用' | '停用'
+  created_by: number
+  created_at: string
+  updated_at: string
+}
 
 export interface ReportOut {
   id: number

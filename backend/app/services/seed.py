@@ -19,6 +19,7 @@ from app.core.logging import get_logger
 from app.core.security import hash_password
 from app.models.material import MaterialClass
 from app.models.prompt import PromptTemplate
+from app.models.report import ReportTemplate, ReportType
 from app.models.user import User
 from app.services.analysis_service import DEFAULT_SYSTEM_PROMPT as DEFAULT_ANALYSIS_SYSTEM_PROMPT
 from app.services.script_service import DEFAULT_SYSTEM_PROMPT as DEFAULT_SCRIPT_SYSTEM_PROMPT
@@ -99,7 +100,45 @@ def seed_builtin_templates(db: Session) -> None:
         logger.info("已补建内置提示词模板：%s", "、".join(created))
 
 
+def seed_report_templates(db: Session) -> None:
+    admin = db.scalar(select(User).where(User.username == settings.seed_admin_username))
+    if admin is None:
+        return
+    defaults = {
+        ReportType.运营数据报告: {
+            "name": "默认运营数据报告",
+            "content_schema": {"section_order": ["分析任务结果", "采集结果", "业务原始数据", "来源缺口"]},
+        },
+        ReportType.市场分析周报: {
+            "name": "默认市场分析周报",
+            "content_schema": {"section_order": ["研究助手报告", "采集结果", "外部检索结论", "来源缺口"]},
+        },
+    }
+    for report_type, values in defaults.items():
+        exists = db.scalar(
+            select(ReportTemplate.id).where(
+                ReportTemplate.report_type == report_type,
+                ReportTemplate.is_default.is_(True),
+                ReportTemplate.status == PromptStatus.启用,
+            )
+        )
+        if exists:
+            continue
+        db.add(
+            ReportTemplate(
+                report_type=report_type,
+                name=values["name"],
+                content_schema=values["content_schema"],
+                is_default=True,
+                status=PromptStatus.启用,
+                created_by=admin.id,
+            )
+        )
+    db.commit()
+
+
 def run_seed(db: Session) -> None:
     seed_admin(db)
     seed_material_classes(db)
     seed_builtin_templates(db)
+    seed_report_templates(db)

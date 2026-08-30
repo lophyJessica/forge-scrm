@@ -14,6 +14,7 @@ import type {
   ReportGenerationStatus,
   ReportOut,
   ReportType,
+  ReportTemplateOut,
   ResearchReferenceOut,
   ResearchReportOut,
   ResearchTaskOut,
@@ -34,6 +35,7 @@ type ReportSourceKey =
 type ReportFormValues = {
   report_type: ReportType
   period: [Dayjs, Dayjs]
+  templateId?: number
 } & Partial<Record<ReportSourceKey, number[]>>
 
 type SourceOption = {
@@ -114,6 +116,7 @@ export default function ReportList() {
   const [creating, setCreating] = useState(false)
   const [sourceLoading, setSourceLoading] = useState(false)
   const [sourceOptions, setSourceOptions] = useState<Partial<Record<ReportSourceKey, SourceOption[]>>>({})
+  const [templateOptions, setTemplateOptions] = useState<ReportTemplateOut[]>([])
   const sourceLoadId = useRef(0)
   const reportType = Form.useWatch('report_type', form)
   const period = Form.useWatch('period', form)
@@ -146,10 +149,11 @@ export default function ReportList() {
     setSourceOptions({})
     try {
       if (type === '运营数据报告') {
-        const [analysis, collection, rawData] = await Promise.all([
+        const [analysis, collection, rawData, templates] = await Promise.all([
           http.get<PageResult<AnalysisTaskOut>>('/analysis-tasks', { params: { status: '已确认', page_size: 200 } }),
           http.get<PageResult<CollectionResultOut>>('/collection-results', { params: { page_size: 200 } }),
           http.get<PageResult<RawDataOut>>('/raw-data', { params: { page_size: 200 } }),
+          http.get<PageResult<ReportTemplateOut>>('/report-templates', { params: { report_type: type, status: '启用', page_size: 200 } }),
         ])
         if (sourceLoadId.current !== loadId) return
         setSourceOptions({
@@ -169,13 +173,16 @@ export default function ReportList() {
             times: [item.collected_at, item.window_start],
           })),
         })
+        setTemplateOptions(templates.data.items)
+        form.setFieldValue('templateId', templates.data.items.find((item) => item.is_default)?.id)
         return
       }
 
-      const [collection, tasks, references] = await Promise.all([
+      const [collection, tasks, references, templates] = await Promise.all([
         http.get<PageResult<CollectionResultOut>>('/collection-results', { params: { page_size: 200 } }),
         http.get<PageResult<ResearchTaskOut>>('/research-tasks', { params: { status: 'success', page_size: 200 } }),
         http.get<PageResult<ResearchReferenceOut>>('/research-references', { params: { page_size: 200 } }),
+        http.get<PageResult<ReportTemplateOut>>('/report-templates', { params: { report_type: type, status: '启用', page_size: 200 } }),
       ])
       const reports = await Promise.all(
         tasks.data.items.map((task) => http.get<ResearchReportOut>(`/research-tasks/${task.id}/report`)),
@@ -200,6 +207,8 @@ export default function ReportList() {
             times: [item.cited_at],
           })),
       })
+      setTemplateOptions(templates.data.items)
+      form.setFieldValue('templateId', templates.data.items.find((item) => item.is_default)?.id)
     } finally {
       if (sourceLoadId.current === loadId) setSourceLoading(false)
     }
@@ -213,6 +222,7 @@ export default function ReportList() {
         report_type: values.report_type,
         period_start: start.format('YYYY-MM-DDTHH:mm:ss'),
         period_end: end.format('YYYY-MM-DDTHH:mm:ss'),
+        template_id: values.templateId,
         source_config: sourceConfig,
       })
       message.success('报告已创建，开始生成')
@@ -244,6 +254,9 @@ export default function ReportList() {
       content: (
         <Descriptions column={1} size="small">
           <Descriptions.Item label="报告类型">{values.report_type}</Descriptions.Item>
+          <Descriptions.Item label="报告模板">
+            {templateOptions.find((item) => item.id === values.templateId)?.name || '无（使用默认输出结构）'}
+          </Descriptions.Item>
           <Descriptions.Item label="来源时间窗">
             {values.period[0].format('YYYY-MM-DD HH:mm:ss')} ~ {values.period[1].format('YYYY-MM-DD HH:mm:ss')}
           </Descriptions.Item>
@@ -296,6 +309,7 @@ export default function ReportList() {
             sourceLoadId.current += 1
             form.resetFields()
             setSourceOptions({})
+            setTemplateOptions([])
             setModalOpen(true)
           }}
         >
@@ -381,13 +395,32 @@ export default function ReportList() {
         cancelText="取消"
       >
         <Form form={form} layout="vertical">
-          <Form.Item name="report_type" label="报告类型" rules={[{ required: true, message: '请选择报告类型' }]}>
+          <Form.Item
+            name="report_type"
+            label="报告类型"
+            rules={[{ required: true, message: '请选择报告类型' }]}
+          >
             <Select
               options={REPORT_TYPES.map((value) => ({ label: value, value }))}
               onChange={(value: ReportType) => {
                 clearSourceSelection()
+                form.setFieldValue('templateId', undefined)
                 void loadSourceOptions(value)
               }}
+            />
+          </Form.Item>
+          <Form.Item name="templateId" label="报告模板">
+            <Select
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              disabled={!reportType || sourceLoading}
+              loading={sourceLoading}
+              placeholder={reportType ? '选择模板（默认模板会预选）' : '请先选择报告类型'}
+              options={templateOptions.map((template) => ({
+                value: template.id,
+                label: `${template.name}${template.is_default ? '（默认）' : ''}`,
+              }))}
             />
           </Form.Item>
           <Form.Item name="period" label="来源时间窗（统计周期）" rules={[{ required: true, message: '请选择时间窗' }]}>

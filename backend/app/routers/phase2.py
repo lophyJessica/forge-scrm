@@ -1,11 +1,13 @@
 """二期自动采集与研究助手 CRUD 及执行入口。"""
 
-from datetime import datetime
+import hashlib
+import json
+from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Query
 from sqlalchemy import func, select
 
-from app.core.deps import CurrentUser, DbSession
+from app.core.deps import CurrentUser, DbSession, assert_material_class_visible, has_permission
 from app.core.exceptions import BizError, not_found
 from app.models.phase2 import (
     BenchmarkAccount,
@@ -18,6 +20,9 @@ from app.models.phase2 import (
     ResearchTask,
     ResearchTaskStatus,
 )
+from app.core.enums import MaterialStatus, Permission, ScriptStatus, SourceType, TopicStatus
+from app.models.material import Material
+from app.models.material import MaterialClass, MaterialTag, Tag
 from app.models.base import utcnow
 from app.schemas.common import OkResult, PageResult
 from app.schemas.phase2 import (
@@ -26,6 +31,7 @@ from app.schemas.phase2 import (
     BenchmarkAccountUpdate,
     CollectionRecordOut,
     CollectionResultOut,
+    CollectionResultMaterialCreate,
     CollectionTaskCreate,
     CollectionTaskOut,
     CollectionTaskUpdate,
@@ -34,14 +40,60 @@ from app.schemas.phase2 import (
     ResearchTaskCreate,
     ResearchTaskOut,
     ResearchTaskUpdate,
+    ResearchMaterializeRequest,
+    ResearchMaterializeResult,
+    ResearchTopicGenerateRequest,
+    ResearchScriptGenerateRequest,
 )
+from app.schemas.material import MaterialOut
+from app.schemas.script import ScriptGenerateResult, ScriptOut
+from app.schemas.topic import TopicGenerateResult, TopicOut
+from app.models.prompt import PromptTemplate
+from app.models.script import Script
+from app.models.topic import Topic
 from app.services import collection_executor, research_executor
+from app.services import material_service
+from app.services import deepseek_service, script_service, topic_service
 
 router = APIRouter(prefix="/api", tags=["二期骨架"])
 
 
 def _task_no(prefix: str) -> str:
     return f"{prefix}{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+
+
+def _collection_idempotency_key(payload: CollectionTaskCreate) -> str:
+    config = dict(payload.scope_config or {})
+    raw_ids = config.get("benchmark_account_ids", config.get("account_ids", []))
+    account_ids: list[int] = []
+    if isinstance(raw_ids, list):
+        for raw_id in raw_ids:
+            try:
+                account_id = int(raw_id)
+            except (TypeError, ValueError):
+                continue
+            if account_id not in account_ids:
+                account_ids.append(account_id)
+    normalized_scope = {
+        "benchmark_account_ids": sorted(account_ids),
+    }
+    for key, value in config.items():
+        if key not in {"account_ids", "benchmark_account_ids", "public_urls", "adapter"}:
+            normalized_scope[key] = value
+
+    def normalized_time(value: datetime) -> str:
+        if value.tzinfo is not None:
+            return value.astimezone(timezone.utc).isoformat()
+        return value.isoformat()
+
+    payload_data = {
+        "scope_type": payload.scope_type,
+        "scope_config": normalized_scope,
+        "time_window_start": normalized_time(payload.time_window_start),
+        "time_window_end": normalized_time(payload.time_window_end),
+    }
+    encoded = json.dumps(payload_data, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
 # ==================== 自动采集：对标账号 ====================
@@ -192,6 +244,53 @@ def create_collection_task(
     task_no = payload.task_no or _task_no("CT")
     if db.scalar(select(CollectionTask.id).where(CollectionTask.task_no == task_no)):
         raise BizError("采集任务编号已存在")
+    if payload.scope_type == "benchmark_account":
+        raw_account_ids = (payload.scope_config or {}).get(
+            "benchmark_account_ids", (payload.scope_config or {}).get("account_ids", [])
+        )
+        if not isinstance(raw_account_ids, list) or not raw_account_ids:
+            raise BizError("scope_config 必须包含至少一个 benchmark_account_ids")
+        account_ids = []
+        for raw_id in raw_account_ids:
+            try:
+                account_id = int(raw_id)
+            except (TypeError, ValueError):
+                continue
+            if account_id not in account_ids:
+                account_ids.append(account_id)
+        if not account_ids:
+            raise BizError("scope_config 必须包含有效的 benchmark_account_ids")
+        accounts = list(db.scalars(select(BenchmarkAccount).where(BenchmarkAccount.id.in_(account_ids))).all())
+        missing_ids = [account_id for account_id in account_ids if account_id not in {account.id for account in accounts}]
+        if missing_ids:
+            raise BizError(f"对标账号不存在：{missing_ids}")
+        disabled = [account.account_identifier for account in accounts if not account.enabled]
+        if disabled:
+            raise BizError(f"对标账号已停用，不能创建采集任务：{', '.join(disabled)}")
+    idempotency_key = _collection_idempotency_key(payload)
+    existing = db.scalar(
+        select(CollectionTask)
+        .where(CollectionTask.idempotency_key == idempotency_key)
+        .order_by(CollectionTask.id.desc())
+    )
+    if existing is not None:
+        result_count = db.scalar(
+            select(func.count()).select_from(CollectionResult).where(CollectionResult.task_id == existing.id)
+        ) or 0
+        raise BizError(
+            {
+                "code": "COLLECTION_TASK_DUPLICATE",
+                "message": "检测到相同账号、时间窗和采集范围的任务",
+                "existing_task": {
+                    "id": existing.id,
+                    "task_no": existing.task_no,
+                    "status": existing.status.value,
+                    "result_count": result_count,
+                    "created_at": existing.created_at.isoformat(),
+                },
+            },
+            code=409,
+        )
     task = CollectionTask(
         task_no=task_no,
         trigger_type=payload.trigger_type,
@@ -201,6 +300,7 @@ def create_collection_task(
         time_window_end=payload.time_window_end,
         status=CollectionTaskStatus.pending,
         requested_by=current_user.id,
+        idempotency_key=idempotency_key,
     )
     db.add(task)
     db.commit()
@@ -245,6 +345,14 @@ def update_collection_task(
             raise BizError("时间窗结束不能早于开始")
     for key, value in data.items():
         setattr(task, key, value)
+    task.idempotency_key = _collection_idempotency_key(
+        CollectionTaskCreate(
+            scope_type=task.scope_type,
+            scope_config=task.scope_config,
+            time_window_start=task.time_window_start,
+            time_window_end=task.time_window_end,
+        )
+    )
     db.commit()
     db.refresh(task)
     return CollectionTaskOut.model_validate(task)
@@ -349,6 +457,64 @@ def list_collection_results(
         page_size=page_size,
         items=[CollectionResultOut.model_validate(row) for row in rows],
     )
+
+
+@router.post(
+    "/collection/records/{record_id}/retry",
+    response_model=CollectionRecordOut,
+    summary="重试单条采集记录",
+)
+def retry_collection_record(record_id: int, _: CurrentUser, db: DbSession) -> CollectionRecordOut:
+    record = collection_executor.retry_record(db, record_id)
+    return CollectionRecordOut.model_validate(record)
+
+
+@router.post(
+    "/collection-results/{result_id}/material",
+    response_model=MaterialOut,
+    summary="采集结果沉淀为资料",
+)
+def materialize_collection_result(
+    result_id: int,
+    payload: CollectionResultMaterialCreate,
+    current_user: CurrentUser,
+    db: DbSession,
+) -> MaterialOut:
+    result = db.get(CollectionResult, result_id)
+    if result is None:
+        raise not_found("采集结果")
+    material_class = db.get(MaterialClass, payload.class_id)
+    if material_class is None:
+        raise not_found("资料分类")
+    assert_material_class_visible(current_user, payload.class_id)
+    if payload.tags and not has_permission(current_user, Permission.标签创建):
+        existing_tags = {tag.name for tag in db.scalars(select(Tag)).all()}
+        new_tags = [tag for tag in payload.tags if tag.strip() and tag.strip() not in existing_tags]
+        if new_tags:
+            raise BizError("缺少功能权限：标签创建", code=403)
+
+    title = (payload.title or "").strip() or f"{result.account_identifier or '采集结果'} #{result.id}"
+    material = Material(
+        title=title[:200],
+        content=result.raw_content,
+        class_id=payload.class_id,
+        source_type=SourceType.对标,
+        source_url=(result.source_url or "")[:500] or None,
+        trust_level=payload.trust_level,
+        valid_from=payload.valid_from,
+        valid_until=payload.valid_until,
+        status=MaterialStatus.草稿,
+        is_ai_product=result.is_ai_product,
+        created_by=current_user.id,
+    )
+    db.add(material)
+    db.flush()
+    if payload.tags:
+        tags = material_service.resolve_tags(db, payload.tags, current_user.id)
+        material_service.set_material_tags(db, material, tags)
+    db.commit()
+    db.refresh(material)
+    return material_service.to_out(db, material)
 
 
 # ==================== 研究助手：任务 ====================
@@ -537,4 +703,223 @@ def list_research_references(
         page=page,
         page_size=page_size,
         items=[ResearchReferenceOut.model_validate(row) for row in rows],
+    )
+
+
+def _report_context(report: ResearchReport, limit: int = 12000) -> str:
+    parts = [f"研究报告：{report.title}", f"摘要：{report.summary}", f"正文：{report.content}"]
+    if report.conclusions:
+        parts.append(f"结论：{json.dumps(report.conclusions, ensure_ascii=False)}")
+    return "\n".join(parts)[:limit]
+
+
+@router.post(
+    "/research-reports/{report_id}/materials",
+    response_model=ResearchMaterializeResult,
+    summary="研究报告沉淀为资料",
+)
+def materialize_research_report(
+    report_id: int,
+    payload: ResearchMaterializeRequest,
+    current_user: CurrentUser,
+    db: DbSession,
+) -> ResearchMaterializeResult:
+    report = db.get(ResearchReport, report_id)
+    if not report:
+        raise not_found("研究报告")
+    if not db.get(MaterialClass, payload.class_id):
+        raise not_found("资料分类")
+    assert_material_class_visible(current_user, payload.class_id)
+
+    sections = report.sections if isinstance(report.sections, dict) else {}
+    selected = [key for key in dict.fromkeys(payload.section_keys) if key in sections]
+    if payload.section_keys and len(selected) != len(set(payload.section_keys)):
+        raise BizError("所选报告章节不存在")
+    chunks: list[tuple[str, str]]
+    if selected:
+        chunks = [
+            (f"{report.title} · {key}", json.dumps(sections[key], ensure_ascii=False, indent=2))
+            for key in selected
+        ]
+    else:
+        chunks = [
+            (
+                report.title,
+                f"{report.summary}\n\n{report.content}\n\n结论：{json.dumps(report.conclusions or {}, ensure_ascii=False)}",
+            )
+        ]
+
+    materials: list[Material] = []
+    for title, content in chunks:
+        material = Material(
+            title=title[:200],
+            content=content,
+            class_id=payload.class_id,
+            source_type=SourceType.报告,
+            source_url=None,
+            trust_level=payload.trust_level,
+            valid_from=payload.valid_from,
+            valid_until=payload.valid_until,
+            status=MaterialStatus.草稿,
+            is_ai_product=True,
+            created_by=current_user.id,
+        )
+        db.add(material)
+        materials.append(material)
+    db.commit()
+    for material in materials:
+        db.refresh(material)
+    return ResearchMaterializeResult(
+        material_ids=[material.id for material in materials],
+        materials=[MaterialOut.model_validate(material).model_dump(mode="json") for material in materials],
+    )
+
+
+@router.post(
+    "/research-reports/{report_id}/topics",
+    response_model=TopicGenerateResult,
+    summary="基于研究报告生成选题",
+)
+def generate_topics_from_research_report(
+    report_id: int,
+    payload: ResearchTopicGenerateRequest,
+    current_user: CurrentUser,
+    db: DbSession,
+) -> TopicGenerateResult:
+    report = db.get(ResearchReport, report_id)
+    if not report:
+        raise not_found("研究报告")
+    system_prompt, user_prompt, snapshot, _ = topic_service.build_prompt(
+        db,
+        payload.direction,
+        payload.specialty,
+        payload.count,
+        payload.material_ids,
+        payload.prompt_template_id,
+        payload.prompt_content,
+    )
+    user_prompt = f"{user_prompt}\n\n研究报告上下文（仅作事实参考）：\n{_report_context(report)}"
+    try:
+        items, raw = deepseek_service.chat_json(
+            system_prompt,
+            user_prompt,
+            validator=topic_service.validate_topics_payload(payload.count),
+        )
+    except deepseek_service.DeepSeekError as exc:
+        archive = deepseek_service.archive_raw(exc.raw, "research_topic_generate_failed")
+        raise BizError(f"选题生成失败，可重试。原始响应留档：{archive}；原因：{exc.message}") from exc
+    archive = deepseek_service.archive_raw(raw, "research_topic_generate")
+    seen = topic_service.existing_title_keys(db)
+    batch_no = topic_service.new_batch_no()
+    saved: list[Topic] = []
+    deduped = 0
+    for item in items:
+        key = topic_service.normalize_title(item["title"])
+        if key in seen:
+            deduped += 1
+            continue
+        seen.add(key)
+        topic = Topic(
+            title=item["title"],
+            direction=payload.direction,
+            specialty=payload.specialty,
+            customer_scenario=item["customer_scenario"],
+            user_perspective=item["user_perspective"],
+            business_direction=item["business_direction"],
+            core_angle=item["core_angle"],
+            topic_principle=item["topic_principle"],
+            topic_angle=item["topic_angle"],
+            status=TopicStatus.待筛选,
+            batch_no=batch_no,
+            prompt_version_snapshot={**(snapshot or {}), "research_report_id": report.id},
+            ai_raw_response=raw,
+            created_by=current_user.id,
+        )
+        db.add(topic)
+        db.flush()
+        if payload.material_ids:
+            topic_service.set_topic_materials(db, topic, payload.material_ids)
+        saved.append(topic)
+    db.commit()
+    for topic in saved:
+        db.refresh(topic)
+    return TopicGenerateResult(
+        batch_no=batch_no,
+        requested=payload.count,
+        generated=len(items),
+        deduped=deduped,
+        saved=len(saved),
+        topics=[topic_service.to_out(db, topic) for topic in saved],
+        ai_raw_archive=archive,
+    )
+
+
+@router.post(
+    "/research-reports/{report_id}/scripts",
+    response_model=ScriptGenerateResult,
+    summary="基于研究报告生成脚本",
+)
+def generate_scripts_from_research_report(
+    report_id: int,
+    payload: ResearchScriptGenerateRequest,
+    current_user: CurrentUser,
+    db: DbSession,
+) -> ScriptGenerateResult:
+    report = db.get(ResearchReport, report_id)
+    if not report:
+        raise not_found("研究报告")
+    topic = db.get(Topic, payload.topic_id)
+    if not topic:
+        raise not_found("选题")
+    if topic.status not in (TopicStatus.已选定, TopicStatus.已生成脚本):
+        raise BizError(f"选题必须先人工筛选为「已选定」才能生成脚本，当前：{topic.status.value}")
+    elements = [item.value for item in payload.content_elements]
+    system_prompt, user_prompt, snapshot = script_service.build_prompt(
+        db,
+        topic,
+        payload.style,
+        elements,
+        payload.version_count,
+        payload.material_ids,
+        payload.prompt_template_id,
+        payload.prompt_content,
+    )
+    user_prompt = f"{user_prompt}\n\n研究报告上下文（仅作事实参考）：\n{_report_context(report)}"
+    try:
+        contents, raw = deepseek_service.chat_json(
+            system_prompt,
+            user_prompt,
+            validator=script_service.validate_scripts_payload(payload.version_count),
+        )
+    except deepseek_service.DeepSeekError as exc:
+        archive = deepseek_service.archive_raw(exc.raw, "research_script_generate_failed")
+        raise BizError(f"脚本生成失败，可重试。原始响应留档：{archive}；原因：{exc.message}") from exc
+    archive = deepseek_service.archive_raw(raw, "research_script_generate")
+    saved: list[Script] = []
+    for content in contents[: payload.version_count]:
+        script = Script(
+            topic_id=topic.id,
+            content=content,
+            style=payload.style,
+            content_elements=elements,
+            current_version=1,
+            status=ScriptStatus.草稿,
+            created_by=current_user.id,
+            modified_by=current_user.id,
+            material_refs=payload.material_ids or None,
+            prompt_version_snapshot={**(snapshot or {}), "research_report_id": report.id},
+        )
+        db.add(script)
+        db.flush()
+        script_service.add_version(db, script, content, current_user.id, note="AI 研究报告生成初版")
+        saved.append(script)
+    topic.status = TopicStatus.已生成脚本
+    db.commit()
+    for script in saved:
+        db.refresh(script)
+    return ScriptGenerateResult(
+        topic_id=topic.id,
+        generated=len(saved),
+        scripts=[script_service.to_out(db, script) for script in saved],
+        ai_raw_archive=archive,
     )

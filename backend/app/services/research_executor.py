@@ -15,7 +15,15 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.exceptions import BizError, not_found
 from app.models.base import utcnow
-from app.models.phase2 import ResearchReference, ResearchReport, ResearchTask, ResearchTaskStatus
+from app.core.enums import MaterialStatus
+from app.models.material import Material
+from app.models.phase2 import (
+    CollectionResult,
+    ResearchReference,
+    ResearchReport,
+    ResearchTask,
+    ResearchTaskStatus,
+)
 from app.services import deepseek_service
 
 
@@ -35,6 +43,10 @@ class SearchHit:
     content: str
     score: float | None
     raw: dict[str, Any]
+    source_kind: str = "external_url"
+    material_id: int | None = None
+    collection_result_id: int | None = None
+    source_type: str | None = None
 
 
 class SearchProvider(Protocol):
@@ -126,7 +138,7 @@ def execute_task(db: Session, task_id: int) -> ResearchTask:
     db.commit()
 
     try:
-        hits = _search(task)
+        hits = _search(db, task)
     except SearchProviderError as exc:
         _mark_failed(db, task, exc.code, exc.message)
         raise BizError(f"研究任务检索失败：{exc.message}") from exc
@@ -138,7 +150,7 @@ def execute_task(db: Session, task_id: int) -> ResearchTask:
     task.checkpoint_data = {
         "search_provider": "tavily",
         "source_count": len(hits),
-        "source_urls": [hit.url for hit in hits],
+        "source_urls": [hit.url for hit in hits if hit.url],
         "saved_at": utcnow().isoformat(),
     }
     db.commit()
@@ -151,13 +163,15 @@ def execute_task(db: Session, task_id: int) -> ResearchTask:
             db.add(
                 ResearchReference(
                     report_id=report.id,
-                    source_kind="external_url",
-                    source_url=hit.url,
+                    source_kind=hit.source_kind,
+                    source_url=hit.url or None,
                     source_title=hit.title,
-                    search_provider="tavily",
+                    search_provider="tavily" if hit.source_kind == "external_url" else None,
+                    collection_result_id=hit.collection_result_id,
+                    material_id=hit.material_id,
                     source_snapshot=json.dumps(hit.raw, ensure_ascii=False),
                     evidence_summary=hit.content or None,
-                    source_type="web_search",
+                    source_type=hit.source_type or ("web_search" if hit.source_kind == "external_url" else hit.source_kind),
                     cited_at=utcnow(),
                 )
             )
@@ -197,16 +211,95 @@ def retry_task(db: Session, task_id: int) -> ResearchTask:
     return execute_task(db, task_id)
 
 
-def _search(task: ResearchTask) -> list[SearchHit]:
+def _search(db: Session, task: ResearchTask) -> list[SearchHit]:
     config = task.scope_config or {}
-    query = str(config.get("query") or f"{task.topic}\n研究目标：{task.objective}")
-    max_results = _int_or_default(config.get("max_results"), 5)
-    return get_search_provider(task).search(query, max_results=max_results)
+    source_types = _source_types(config)
+    hits: list[SearchHit] = []
+    if "material" in source_types:
+        hits.extend(_material_hits(db, task, _id_list(config.get("material_ids"))))
+    if "collection_result" in source_types:
+        hits.extend(_collection_hits(db, task, _id_list(config.get("collection_result_ids"))))
+    if "external_search" in source_types:
+        external = config.get("external_search") if isinstance(config.get("external_search"), dict) else {}
+        query = str(external.get("keywords") or config.get("query") or f"{task.topic}\n研究目标：{task.objective}")
+        max_results = _int_or_default(external.get("max_results", config.get("max_results")), 5)
+        hits.extend(get_search_provider(task).search(query, max_results=max_results))
+    if not hits:
+        raise SearchProviderError("研究范围未找到可用来源", code="RESEARCH_SCOPE_EMPTY")
+    return hits
+
+
+def _source_types(config: dict[str, Any]) -> set[str]:
+    """读取产品化范围，并把旧 JSON 任务兼容为外部检索。"""
+    raw = config.get("source_types")
+    if not isinstance(raw, list):
+        return {"external_search"}
+    aliases = {
+        "资料库": "material",
+        "material": "material",
+        "materials": "material",
+        "自动采集结果": "collection_result",
+        "collection_result": "collection_result",
+        "collection_results": "collection_result",
+        "外部检索": "external_search",
+        "external_search": "external_search",
+    }
+    return {aliases[value] for value in raw if isinstance(value, str) and value in aliases}
+
+
+def _material_hits(db: Session, task: ResearchTask, material_ids: list[int]) -> list[SearchHit]:
+    stmt = select(Material).where(Material.status == MaterialStatus.已生效)
+    if material_ids:
+        stmt = stmt.where(Material.id.in_(material_ids))
+    if task.time_window_start and task.time_window_end:
+        stmt = stmt.where(
+            Material.valid_until >= task.time_window_start.date(),
+            Material.valid_from <= task.time_window_end.date(),
+        )
+    rows = db.scalars(stmt.order_by(Material.created_at.desc(), Material.id.desc())).all()
+    return [
+        SearchHit(
+            title=row.title,
+            url=row.source_url or "",
+            content=row.content,
+            score=None,
+            raw={"id": row.id, "title": row.title, "content": row.content},
+            source_kind="material",
+            material_id=row.id,
+            source_type=row.source_type.value,
+        )
+        for row in rows
+    ]
+
+
+def _collection_hits(db: Session, task: ResearchTask, result_ids: list[int]) -> list[SearchHit]:
+    stmt = select(CollectionResult)
+    if result_ids:
+        stmt = stmt.where(CollectionResult.id.in_(result_ids))
+    if task.time_window_start and task.time_window_end:
+        stmt = stmt.where(
+            CollectionResult.collected_at >= task.time_window_start,
+            CollectionResult.collected_at <= task.time_window_end,
+        )
+    rows = db.scalars(stmt.order_by(CollectionResult.created_at.desc(), CollectionResult.id.desc())).all()
+    return [
+        SearchHit(
+            title=f"{row.platform or row.business_object} / {row.account_identifier or '采集结果'}",
+            url=row.source_url or "",
+            content=row.raw_content,
+            score=None,
+            raw={"id": row.id, "structured_data": row.structured_data, "raw_content": row.raw_content},
+            source_kind="collection_result",
+            collection_result_id=row.id,
+            source_type="collection_result",
+        )
+        for row in rows
+    ]
 
 
 def _generate_report(task: ResearchTask, hits: list[SearchHit]) -> tuple[dict[str, Any], str]:
     source_block = "\n".join(
-        f"[{index}] 标题：{hit.title}\nURL：{hit.url}\n摘要：{hit.content}"
+        f"[{index}] 类型：{hit.source_kind}\n标题：{hit.title}\nURL：{hit.url or '内部来源'}\n摘要：{hit.content}"
         for index, hit in enumerate(hits, start=1)
     )
     if not source_block:
@@ -285,6 +378,18 @@ def _float_or_none(value: Any) -> float | None:
         return float(value) if value is not None else None
     except (TypeError, ValueError):
         return None
+
+
+def _id_list(value: Any) -> list[int]:
+    if not isinstance(value, list):
+        return []
+    result: list[int] = []
+    for item in value:
+        try:
+            result.append(int(item))
+        except (TypeError, ValueError):
+            continue
+    return list(dict.fromkeys(result))
 
 
 def _int_or_default(value: Any, default: int) -> int:

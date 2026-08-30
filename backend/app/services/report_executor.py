@@ -68,6 +68,7 @@ def generate_report(db: Session, report_id: int) -> Report:
             "gaps": gaps,
             "error_history": previous_errors,
             "mode": "aggregate",
+            "template": payload.get("template"),
         }
         report.is_ai_product = True
         report.generation_status = ReportGenerationStatus.已完成
@@ -367,13 +368,36 @@ def _build_payload(report: Report, sources: list[dict[str, Any]], gaps: list[str
             f"缺口：{gap_text}。趋势/竞对判断仅在有引用时给出，缺失处已标注。"
         )
 
-    return {
+    payload = {
         "title": title[:500],
         "summary": summary,
         "content": "\n".join(body_parts),
         "sections": sections,
         "conclusions": conclusions,
     }
+    return _apply_template(report, payload)
+
+
+def _apply_template(report: Report, payload: dict[str, Any]) -> dict[str, Any]:
+    """按模板的可选 section_order 组装输出；空模板保持现有输出。"""
+    template = getattr(report, "template", None)
+    schema = template.content_schema if template and isinstance(template.content_schema, dict) else {}
+    if not schema:
+        return payload
+
+    sections = payload.get("sections") or {}
+    order = schema.get("section_order")
+    if isinstance(order, list):
+        ordered = {str(key): sections[str(key)] for key in order if str(key) in sections}
+        ordered.update({key: value for key, value in sections.items() if key not in ordered})
+        payload["sections"] = ordered
+    headings = schema.get("section_titles")
+    if isinstance(headings, dict):
+        payload["sections"] = {
+            headings.get(key, key): value for key, value in (payload.get("sections") or {}).items()
+        }
+    payload["template"] = {"id": template.id, "name": template.name, "schema": schema}
+    return payload
 
 
 def _ops_conclusions(grouped: dict[str, list[dict[str, Any]]], gaps: list[str]) -> dict[str, Any]:

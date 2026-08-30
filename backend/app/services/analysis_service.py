@@ -20,6 +20,7 @@ from app.models.analysis import (
     RawData,
 )
 from app.models.material import Material
+from app.models.phase2 import CollectionResult
 from app.models.prompt import PromptTemplate
 from app.schemas.analysis import AnalysisResultOut, AnalysisTaskOut, RawDataOut
 
@@ -144,7 +145,9 @@ def build_material_snapshot(db: Session, material_ids: list[int]) -> tuple[str, 
     return block, snapshot
 
 
-def build_data_block(rows: list[RawData]) -> str:
+def build_data_block(
+    rows: list[RawData], collection_results: list[CollectionResult] | None = None
+) -> str:
     lines: list[str] = []
     for r in rows:
         source = r.data_source.name if r.data_source else f"数据源{r.source_id}"
@@ -152,6 +155,12 @@ def build_data_block(rows: list[RawData]) -> str:
         lines.append(f"【{source}｜{window}】{(r.raw_content or '')[:2000]}")
         if r.structured:
             lines.append(f"  结构化字段：{r.structured}")
+    for result in collection_results or []:
+        source = " / ".join(filter(None, [result.platform, result.account_identifier])) or "自动采集结果"
+        window = f"{result.window_start:%Y-%m-%d} ~ {result.window_end:%Y-%m-%d}"
+        lines.append(f"【采集结果 #{result.id}｜{source}｜{window}】{result.raw_content[:2000]}")
+        if result.structured_data:
+            lines.append(f"  结构化字段：{result.structured_data}")
     return "\n".join(lines) if lines else "（无内容）"
 
 
@@ -161,6 +170,7 @@ def build_prompt(
     rows: list[RawData],
     material_ids: list[int],
     template_id: int | None,
+    collection_results: list[CollectionResult] | None = None,
 ) -> tuple[str, str, dict | None, dict | None, dict]:
     """返回 (system_prompt, user_prompt, prompt_snapshot, material_snapshot, output_schema)。"""
     material_block, material_snapshot = build_material_snapshot(db, material_ids)
@@ -190,7 +200,7 @@ def build_prompt(
     user_prompt = DEFAULT_USER_PROMPT_TEMPLATE.format(
         task_type=task_type,
         material_block=material_block,
-        data_block=build_data_block(rows),
+        data_block=build_data_block(rows, collection_results),
     )
     return system_prompt, user_prompt, prompt_snapshot, material_snapshot, output_schema
 
@@ -215,11 +225,16 @@ def result_to_out(db: Session, result: AnalysisResult) -> AnalysisResultOut:
 def task_to_out(db: Session, task: AnalysisTask) -> AnalysisTaskOut:
     out = AnalysisTaskOut.model_validate(task)
     out.has_ai_raw_response = bool(task.ai_raw_response)
+    inputs = list(db.scalars(select(AnalysisTaskInput).where(AnalysisTaskInput.task_id == task.id)).all())
     out.raw_data_ids = [
         row.raw_data_id
-        for row in db.scalars(
-            select(AnalysisTaskInput).where(AnalysisTaskInput.task_id == task.id)
-        ).all()
+        for row in inputs
+        if row.raw_data_id is not None
+    ]
+    out.collection_result_ids = [
+        row.collection_result_id
+        for row in inputs
+        if row.collection_result_id is not None
     ]
     out.results = [
         result_to_out(db, r)

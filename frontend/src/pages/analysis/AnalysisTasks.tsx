@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Alert, Button, Card, Form, Input, Modal, Popconfirm, Select, Table, Tag, message } from 'antd'
 import { http } from '@/api/client'
 import { TABLE_EMPTY } from '@/components/tableEmpty'
@@ -7,12 +7,13 @@ import { TableActions } from '@/components/TableActions'
 import { useAuthStore } from '@/store/auth'
 import { PERM, useMetaStore } from '@/store/meta'
 import { FILTER_CARD_STYLE, TABLE_PAGINATION, displayStatus, statusTagColor, visibleStatusOptions } from '@/theme'
-import type { AnalysisTaskOut, MaterialOut, PageResult, PromptTemplateOut, RawDataOut } from '@/types'
+import type { AnalysisTaskOut, CollectionResultOut, MaterialOut, PageResult, PromptTemplateOut, RawDataOut } from '@/types'
 
 export default function AnalysisTasks() {
   const [queryForm] = Form.useForm()
   const [form] = Form.useForm()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const can = useAuthStore((s) => s.can)
   const isAdmin = useAuthStore((s) => s.isAdmin)
   const options = useMetaStore((s) => s.options)
@@ -23,8 +24,10 @@ export default function AnalysisTasks() {
   const [running, setRunning] = useState<number | null>(null)
   const [open, setOpen] = useState(false)
   const [rawData, setRawData] = useState<RawDataOut[]>([])
+  const [collectionResults, setCollectionResults] = useState<CollectionResultOut[]>([])
   const [materials, setMaterials] = useState<MaterialOut[]>([])
   const [templates, setTemplates] = useState<PromptTemplateOut[]>([])
+  const prefillOpened = useRef(false)
 
   const load = useCallback(
     async (targetPage = 1) => {
@@ -47,22 +50,40 @@ export default function AnalysisTasks() {
     void load(1)
   }, [load])
 
-  const openModal = async () => {
+  const openModal = useCallback(async () => {
     form.resetFields()
-    const [raw, mat, tpl] = await Promise.all([
+    const [raw, collection, mat, tpl] = await Promise.all([
       http.get<PageResult<RawDataOut>>('/raw-data', { params: { page_size: 200 } }),
+      http.get<PageResult<CollectionResultOut>>('/collection-results', { params: { page_size: 200 } }),
       http.get<PageResult<MaterialOut>>('/materials', { params: { status: '已生效', page_size: 200 } }),
       http.get<PageResult<PromptTemplateOut>>('/prompt-templates', { params: { page_size: 100 } }),
     ])
     setRawData(raw.data.items)
+    setCollectionResults(collection.data.items)
     setMaterials(mat.data.items)
     setTemplates(tpl.data.items.filter((t) => t.task_type !== '选题生成' && t.task_type !== '脚本生成'))
+    const rawCollectionId = Number(searchParams.get('collection_result_id'))
+    const selectedCollectionId = Number.isInteger(rawCollectionId) && rawCollectionId > 0 && collection.data.items.some((item) => item.id === rawCollectionId)
+      ? [rawCollectionId]
+      : []
+    form.setFieldsValue({ raw_data_ids: [], collection_result_ids: selectedCollectionId })
     setOpen(true)
-  }
+  }, [form, searchParams])
+
+  useEffect(() => {
+    if (!searchParams.get('collection_result_id') || prefillOpened.current) return
+    prefillOpened.current = true
+    void openModal()
+  }, [openModal, searchParams])
 
   const create = async () => {
     const values = await form.validateFields()
-    await http.post('/analysis-tasks', values)
+    if (!(values.raw_data_ids?.length || values.collection_result_ids?.length)) {
+      message.error('至少选择一项分析输入')
+      return
+    }
+    const { task_name, ...payload } = values
+    await http.post('/analysis-tasks', { ...payload, name: task_name || undefined })
     message.success('任务已创建（待执行）')
     setOpen(false)
     void load(1)
@@ -172,19 +193,28 @@ export default function AnalysisTasks() {
       />
 
       <Modal open={open} title="新建分析任务" onCancel={() => setOpen(false)} onOk={create} width={720} okText="创建" cancelText="取消">
-        <Form form={form} layout="vertical" initialValues={{ material_ids: [] }}>
-          <Form.Item name="name" label="任务名称">
+        <Form form={form} layout="vertical" initialValues={{ material_ids: [], raw_data_ids: [], collection_result_ids: [] }}>
+          <Form.Item name="task_name" label="任务名称">
             <Input maxLength={100} placeholder="可留空" />
           </Form.Item>
           <Form.Item name="type" label="任务类型" rules={[{ required: true }]}>
             <Select options={options('analysis_task_type')} />
           </Form.Item>
-          <Form.Item name="raw_data_ids" label="分析输入（原始数据）" rules={[{ required: true }]}>
+          <Form.Item name="raw_data_ids" label="分析输入（原始数据，可选）">
             <Select
               mode="multiple"
               options={rawData.map((r) => ({
                 label: `#${r.id} ${r.source_name || ''} ${(r.raw_content || '').slice(0, 24)}`,
                 value: r.id,
+              }))}
+            />
+          </Form.Item>
+          <Form.Item name="collection_result_ids" label="分析输入（自动采集结果，可选）">
+            <Select
+              mode="multiple"
+              options={collectionResults.map((result) => ({
+                label: `#${result.id} ${result.platform || ''} ${result.account_identifier || ''} ${(result.raw_content || '').slice(0, 24)}`,
+                value: result.id,
               }))}
             />
           </Form.Item>

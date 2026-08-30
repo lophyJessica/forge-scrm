@@ -14,6 +14,37 @@ from app.models.report import (
     ReportReviewStatus,
     ReportType,
 )
+from app.core.enums import PromptStatus
+
+
+class ReportTemplateCreate(BaseModel):
+    report_type: ReportType
+    name: str = Field(..., min_length=1, max_length=100)
+    content_schema: dict[str, Any] = Field(default_factory=dict)
+    is_default: bool = False
+    status: PromptStatus = PromptStatus.启用
+
+
+class ReportTemplateUpdate(BaseModel):
+    report_type: ReportType | None = None
+    name: str | None = Field(None, min_length=1, max_length=100)
+    content_schema: dict[str, Any] | None = None
+    is_default: bool | None = None
+    status: PromptStatus | None = None
+
+
+class ReportTemplateOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    report_type: ReportType
+    name: str
+    content_schema: dict[str, Any]
+    is_default: bool
+    status: PromptStatus
+    created_by: int
+    created_at: datetime
+    updated_at: datetime
 
 
 class ReportCreate(BaseModel):

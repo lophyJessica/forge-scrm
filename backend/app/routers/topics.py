@@ -1,6 +1,7 @@
 """选题库路由（模块 02）：批量生成 / 生成历史 / 人工筛选 / CRUD。"""
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import Response
 from sqlalchemy import func, select
 
 from app.models.user import User
@@ -21,9 +22,41 @@ from app.schemas.topic import (
 )
 from app.services import deepseek_service as ds
 from app.services import topic_service as svc
+from app.utils.csv_io import build_template
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/api/topics", tags=["选题库"])
+
+TOPIC_EXPORT_HEADERS = ["ID", "标题", "方向", "状态", "来源", "生成批次", "创建时间"]
+TOPIC_EXPORT_MAX_ROWS = 5000
+
+
+def _filtered_topics_stmt(
+    *,
+    status: TopicStatus | None = None,
+    direction: str | None = None,
+    specialty: Specialty | None = None,
+    batch_no: str | None = None,
+    keyword: str | None = None,
+):
+    stmt = select(Topic)
+    if status is not None:
+        stmt = stmt.where(Topic.status == status)
+    if direction:
+        stmt = stmt.where(Topic.direction == direction)
+    if specialty is not None:
+        stmt = stmt.where(Topic.specialty == specialty)
+    if batch_no:
+        stmt = stmt.where(Topic.batch_no == batch_no)
+    if keyword:
+        stmt = stmt.where(Topic.title.like(f"%{keyword}%"))
+    return stmt
+
+
+def _display_topic_status(status: TopicStatus | str | None) -> str:
+    """把后端保留状态转换为选题列表使用的用户可见状态。"""
+    value = status.value if isinstance(status, TopicStatus) else status or ""
+    return "已选定" if value == "待审核" else value or "—"
 
 
 @router.post("/generate", response_model=TopicGenerateResult, summary="批量生成选题（R4：每方向10条，跨批次完全重复去重）")
@@ -139,17 +172,13 @@ def list_topics(
     batch_no: str | None = None,
     keyword: str | None = None,
 ) -> PageResult[TopicOut]:
-    stmt = select(Topic)
-    if status is not None:
-        stmt = stmt.where(Topic.status == status)
-    if direction:
-        stmt = stmt.where(Topic.direction == direction)
-    if specialty is not None:
-        stmt = stmt.where(Topic.specialty == specialty)
-    if batch_no:
-        stmt = stmt.where(Topic.batch_no == batch_no)
-    if keyword:
-        stmt = stmt.where(Topic.title.like(f"%{keyword}%"))
+    stmt = _filtered_topics_stmt(
+        status=status,
+        direction=direction,
+        specialty=specialty,
+        batch_no=batch_no,
+        keyword=keyword,
+    )
 
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     rows = db.scalars(
@@ -157,6 +186,47 @@ def list_topics(
     ).all()
     return PageResult[TopicOut](
         total=total, page=page, page_size=page_size, items=[svc.to_out(db, r) for r in rows]
+    )
+
+
+@router.get("/export", summary="按筛选条件导出选题 CSV")
+def export_topics(
+    _: CurrentUser,
+    db: DbSession,
+    status: TopicStatus | None = None,
+    direction: str | None = None,
+    specialty: Specialty | None = None,
+    batch_no: str | None = None,
+    keyword: str | None = None,
+) -> Response:
+    stmt = _filtered_topics_stmt(
+        status=status,
+        direction=direction,
+        specialty=specialty,
+        batch_no=batch_no,
+        keyword=keyword,
+    )
+    total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    if total > TOPIC_EXPORT_MAX_ROWS:
+        raise BizError(f"导出结果超过 {TOPIC_EXPORT_MAX_ROWS} 行，请缩小筛选范围后重试")
+
+    rows = db.scalars(stmt.order_by(Topic.created_at.desc(), Topic.id.desc())).all()
+    csv_rows = [
+        [
+            str(topic.id),
+            topic.title,
+            topic.direction,
+            _display_topic_status(topic.status),
+            "批量生成" if topic.batch_no else "独立创建",
+            topic.batch_no or "",
+            topic.created_at.isoformat(sep=" ", timespec="seconds"),
+        ]
+        for topic in rows
+    ]
+    return Response(
+        content=build_template(TOPIC_EXPORT_HEADERS, csv_rows),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="topic_export.csv"'},
     )
 
 

@@ -155,6 +155,7 @@ class AnalysisTaskInput(Base):
     __tablename__ = "analysis_task_input"
     __table_args__ = (
         UniqueConstraint("task_id", "raw_data_id", name="uk_analysis_task_input"),
+        UniqueConstraint("task_id", "collection_result_id", name="uk_analysis_task_collection_input"),
     )
 
     id: Mapped[int] = pk_column()
@@ -164,8 +165,11 @@ class AnalysisTaskInput(Base):
         nullable=False,
         comment="分析任务 id",
     )
-    raw_data_id: Mapped[int] = mapped_column(
-        BigInt, ForeignKey("raw_data.id"), nullable=False, comment="原始数据 id"
+    raw_data_id: Mapped[int | None] = mapped_column(
+        BigInt, ForeignKey("raw_data.id"), nullable=True, comment="原始数据 id"
+    )
+    collection_result_id: Mapped[int | None] = mapped_column(
+        BigInt, ForeignKey("collection_result.id"), nullable=True, comment="自动采集结果 id"
     )
 
 

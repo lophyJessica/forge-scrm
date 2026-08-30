@@ -35,6 +35,7 @@ import ResearchTaskDetail from '@/pages/research/ResearchTaskDetail'
 import ResearchReport from '@/pages/research/ResearchReport'
 import ReportList from '@/pages/reports/ReportList'
 import ReportDetail from '@/pages/reports/ReportDetail'
+import ReportTemplates from '@/pages/reports/ReportTemplates'
 
 export default function App() {
   return (
@@ -75,6 +76,7 @@ export default function App() {
         <Route path="/analysis/tasks" element={<AnalysisTasks />} />
         <Route path="/analysis/tasks/:id" element={<AnalysisTaskDetail />} />
         <Route path="/reports" element={<ReportList />} />
+        <Route path="/report-templates" element={<ReportTemplates />} />
         <Route path="/reports/:id" element={<ReportDetail />} />
 
         {/* 模块 05 权限 */}

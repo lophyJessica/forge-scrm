@@ -23,12 +23,17 @@ from app.models.report import (
     ReportPushTask,
     ReportReviewStatus,
     ReportType,
+    ReportTemplate,
 )
+from app.core.enums import PromptStatus
 from app.models.user import User
 from app.schemas.common import OkResult, PageResult
 from app.schemas.report import (
     ReportCreate,
     ReportOut,
+    ReportTemplateCreate,
+    ReportTemplateOut,
+    ReportTemplateUpdate,
     ReportPushRecordOut,
     ReportPushTaskCreate,
     ReportPushTaskOut,
@@ -50,6 +55,124 @@ def _no(prefix: str) -> str:
 
 def _default_title(report_type: ReportType, start: datetime, end: datetime) -> str:
     return f"{report_type.value}（{start.strftime('%Y-%m-%d')} 至 {end.strftime('%Y-%m-%d')}）"
+
+
+def _set_default_template(db, template: ReportTemplate) -> None:
+    db.query(ReportTemplate).filter(
+        ReportTemplate.report_type == template.report_type,
+        ReportTemplate.id != template.id,
+    ).update({ReportTemplate.is_default: False}, synchronize_session=False)
+    template.is_default = True
+
+
+@router.get("/report-templates", response_model=PageResult[ReportTemplateOut], summary="报告模板列表")
+def list_report_templates(
+    _: CurrentUser,
+    db: DbSession,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=200),
+    report_type: ReportType | None = None,
+    status: PromptStatus | None = None,
+    keyword: str | None = None,
+) -> PageResult[ReportTemplateOut]:
+    stmt = select(ReportTemplate)
+    if report_type is not None:
+        stmt = stmt.where(ReportTemplate.report_type == report_type)
+    if status is not None:
+        stmt = stmt.where(ReportTemplate.status == status)
+    if keyword:
+        stmt = stmt.where(ReportTemplate.name.like(f"%{keyword}%"))
+    total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    rows = db.scalars(
+        stmt.order_by(ReportTemplate.is_default.desc(), ReportTemplate.created_at.desc(), ReportTemplate.id.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    ).all()
+    return PageResult(total=total, page=page, page_size=page_size, items=[ReportTemplateOut.model_validate(row) for row in rows])
+
+
+@router.post("/report-templates", response_model=ReportTemplateOut, summary="新建报告模板")
+def create_report_template(payload: ReportTemplateCreate, db: DbSession, admin: User = Depends(require_permission(Permission.提示词配置))) -> ReportTemplateOut:
+    template = ReportTemplate(
+        report_type=payload.report_type,
+        name=payload.name.strip(),
+        content_schema=payload.content_schema,
+        is_default=False,
+        status=payload.status,
+        created_by=admin.id,
+    )
+    db.add(template)
+    db.flush()
+    if payload.is_default:
+        _set_default_template(db, template)
+    db.commit()
+    db.refresh(template)
+    return ReportTemplateOut.model_validate(template)
+
+
+@router.get("/report-templates/{template_id}", response_model=ReportTemplateOut, summary="报告模板详情")
+def get_report_template(template_id: int, _: CurrentUser, db: DbSession) -> ReportTemplateOut:
+    template = db.get(ReportTemplate, template_id)
+    if not template:
+        raise not_found("报告模板")
+    return ReportTemplateOut.model_validate(template)
+
+
+@router.put("/report-templates/{template_id}", response_model=ReportTemplateOut, summary="修改报告模板")
+def update_report_template(
+    template_id: int,
+    payload: ReportTemplateUpdate,
+    db: DbSession,
+    admin: User = Depends(require_permission(Permission.提示词配置)),
+) -> ReportTemplateOut:
+    template = db.get(ReportTemplate, template_id)
+    if not template:
+        raise not_found("报告模板")
+    data = payload.model_dump(exclude_unset=True)
+    if "name" in data:
+        data["name"] = data["name"].strip()
+    previous_type = template.report_type
+    wants_default = data.pop("is_default", None)
+    for key, value in data.items():
+        setattr(template, key, value)
+    if template.status != PromptStatus.启用:
+        template.is_default = False
+    if wants_default:
+        if template.status != PromptStatus.启用:
+            raise BizError("停用模板不能设为默认")
+        _set_default_template(db, template)
+    elif wants_default is False and template.is_default:
+        template.is_default = False
+    if previous_type != template.report_type and template.is_default:
+        _set_default_template(db, template)
+    db.commit()
+    db.refresh(template)
+    return ReportTemplateOut.model_validate(template)
+
+
+@router.post("/report-templates/{template_id}/set-default", response_model=ReportTemplateOut, summary="设为默认报告模板")
+def set_default_report_template(template_id: int, db: DbSession, admin: User = Depends(require_permission(Permission.提示词配置))) -> ReportTemplateOut:
+    template = db.get(ReportTemplate, template_id)
+    if not template:
+        raise not_found("报告模板")
+    if template.status != PromptStatus.启用:
+        raise BizError("停用模板不能设为默认")
+    _set_default_template(db, template)
+    db.commit()
+    db.refresh(template)
+    return ReportTemplateOut.model_validate(template)
+
+
+@router.delete("/report-templates/{template_id}", response_model=OkResult, summary="删除报告模板")
+def delete_report_template(template_id: int, db: DbSession, admin: User = Depends(require_permission(Permission.提示词配置))) -> OkResult:
+    template = db.get(ReportTemplate, template_id)
+    if not template:
+        raise not_found("报告模板")
+    if db.scalar(select(func.count()).select_from(Report).where(Report.template_id == template_id)):
+        raise BizError("已有报告使用该模板，不能删除；可停用模板")
+    db.delete(template)
+    db.commit()
+    return OkResult(message="报告模板已删除")
 
 
 def _push_out(task: ReportPushTask) -> ReportPushTaskOut:
@@ -110,6 +233,14 @@ def list_reports(
 
 @router.post("/reports", response_model=ReportOut, summary="创建报告（待生成，不执行）")
 def create_report(payload: ReportCreate, current_user: CurrentUser, db: DbSession) -> ReportOut:
+    if payload.template_id is not None:
+        template = db.get(ReportTemplate, payload.template_id)
+        if template is None:
+            raise not_found("报告模板")
+        if template.report_type != payload.report_type:
+            raise BizError("报告模板类型与报告类型不匹配")
+        if template.status != PromptStatus.启用:
+            raise BizError("停用模板不能用于新报告")
     report_no = _no("RP")
     title = (payload.title or "").strip() or _default_title(
         payload.report_type, payload.period_start, payload.period_end

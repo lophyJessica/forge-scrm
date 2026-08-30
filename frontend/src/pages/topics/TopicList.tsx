@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Card, Form, Input, Select, Space, Table, Tag, Tooltip, message } from 'antd'
-import { http } from '@/api/client'
+import { Button, Card, Form, Input, Modal, Select, Space, Table, Tag, Tooltip, message } from 'antd'
+import { DownloadOutlined } from '@ant-design/icons'
+import { download, http } from '@/api/client'
 import { TABLE_EMPTY } from '@/components/tableEmpty'
 import { TableActions } from '@/components/TableActions'
 import { useMetaStore } from '@/store/meta'
-import { FILTER_CARD_STYLE, TABLE_PAGINATION, statusTagColor } from '@/theme'
+import { FILTER_CARD_STYLE, TABLE_PAGINATION, displayStatus, statusTagColor, visibleStatusOptions } from '@/theme'
 import type { PageResult, TopicOut } from '@/types'
 
 export default function TopicList() {
@@ -17,6 +18,7 @@ export default function TopicList() {
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false)
+  const [exporting, setExporting] = useState(false)
 
   const load = useCallback(
     async (targetPage = 1) => {
@@ -48,16 +50,50 @@ export default function TopicList() {
     void load(page)
   }
 
+  const confirmExport = () => {
+    if (total === 0) {
+      message.info('当前筛选条件下无数据可导出')
+      return
+    }
+
+    const filters = form.getFieldsValue()
+    Modal.confirm({
+      title: '导出 CSV',
+      content: '将按当前筛选条件导出',
+      okText: '确认导出',
+      cancelText: '取消',
+      onOk: async () => {
+        setExporting(true)
+        try {
+          const { data } = await http.get<Blob>('/topics/export', {
+            params: filters,
+            responseType: 'blob',
+          })
+          const now = new Date()
+          const date = [now.getFullYear(), now.getMonth() + 1, now.getDate()]
+            .map((value) => String(value).padStart(2, '0'))
+            .join('')
+          download(data, `选题导出_${date}.csv`)
+        } finally {
+          setExporting(false)
+        }
+      },
+    })
+  }
+
   return (
     <Card
       title="选题列表"
       extra={
         <Space>
-          <Link to="/topics/new">
-            <Button>手动新增</Button>
-          </Link>
           <Link to="/topics/generate">
             <Button type="primary">批量生成</Button>
+          </Link>
+          <Button icon={<DownloadOutlined />} loading={exporting} onClick={confirmExport}>
+            导出 CSV
+          </Button>
+          <Link to="/topics/new">
+            <Button>手动新增</Button>
           </Link>
         </Space>
       }
@@ -73,7 +109,7 @@ export default function TopicList() {
           <Select allowClear placeholder="专业方向" style={{ width: 200 }} options={options('specialty')} />
         </Form.Item>
         <Form.Item name="status">
-          <Select allowClear placeholder="状态" style={{ width: 130 }} options={options('topic_status')} />
+          <Select allowClear placeholder="状态" style={{ width: 130 }} options={visibleStatusOptions(options('topic_status'))} />
         </Form.Item>
         <Form.Item name="batch_no">
           <Input allowClear placeholder="批次号" style={{ width: 160 }} />
@@ -125,7 +161,10 @@ export default function TopicList() {
             title: '状态',
             dataIndex: 'status',
             width: 110,
-            render: (v: string) => <Tag color={statusTagColor(v)}>{v}</Tag>,
+            render: (v: string) => {
+              const label = displayStatus(v, '已选定')
+              return <Tag color={statusTagColor(label)}>{label}</Tag>
+            },
           },
           {
             title: '操作',

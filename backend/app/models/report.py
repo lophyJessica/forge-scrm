@@ -10,6 +10,7 @@ from enum import StrEnum
 from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, JSON, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.enums import PromptStatus
 from app.models._enum_type import enum_type
 from app.models.base import Base, BigInt, LongText, pk_column, utcnow
 
@@ -76,6 +77,39 @@ def _updated_at_column():
     return mapped_column(DateTime, nullable=False, default=utcnow, onupdate=utcnow, comment="修改时间")
 
 
+class ReportTemplate(Base):
+    __tablename__ = "report_template"
+    __table_args__ = (
+        Index("idx_report_template_type_status", "report_type", "status"),
+        Index("idx_report_template_default", "report_type", "is_default"),
+    )
+
+    id: Mapped[int] = pk_column()
+    report_type: Mapped[ReportType] = mapped_column(
+        enum_type(ReportType, "report_template_type"),
+        nullable=False,
+        comment="模板适用的报告类型；新增建议，待确认",
+    )
+    name: Mapped[str] = mapped_column(String(100), nullable=False, comment="模板名称")
+    content_schema: Mapped[dict] = mapped_column(
+        JSON, nullable=False, default=dict, comment="模板内容结构；新增建议，待确认"
+    )
+    is_default: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0", comment="是否该类型默认模板"
+    )
+    status: Mapped[PromptStatus] = mapped_column(
+        enum_type(PromptStatus, "report_template_status"),
+        nullable=False,
+        default=PromptStatus.启用,
+        comment="启用/停用",
+    )
+    created_by: Mapped[int] = mapped_column(
+        BigInt, ForeignKey("user.id"), nullable=False, comment="创建人"
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow, comment="创建时间")
+    updated_at: Mapped[datetime] = _updated_at_column()
+
+
 class Report(Base):
     __tablename__ = "report"
     __table_args__ = (
@@ -103,7 +137,7 @@ class Report(Base):
         DateTime, nullable=False, comment="报告周期结束；周期口径新增建议，待确认"
     )
     template_id: Mapped[int | None] = mapped_column(
-        BigInt, nullable=True, comment="使用的报告模板；新增建议，待确认。本期模板实体未展开"
+        BigInt, ForeignKey("report_template.id"), nullable=True, comment="使用的报告模板；新增建议，待确认"
     )
     source_config: Mapped[dict] = mapped_column(
         JSON, nullable=False, default=dict, comment="来源实体、时间窗和口径配置；新增建议，待确认"
@@ -165,6 +199,7 @@ class Report(Base):
     push_tasks: Mapped[list["ReportPushTask"]] = relationship(
         "ReportPushTask", back_populates="report", cascade="all, delete-orphan"
     )
+    template: Mapped["ReportTemplate | None"] = relationship("ReportTemplate")
 
 
 class ReportPushTask(Base):

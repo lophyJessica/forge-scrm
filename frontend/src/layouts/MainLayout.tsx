@@ -109,6 +109,7 @@ const NAV_GROUPS: MenuGroupDefinition[] = [
       { key: '/analysis/raw-data', label: '原始数据' },
       { key: '/analysis/tasks', label: '分析任务' },
       { key: '/reports', label: '数据报告' },
+      { key: '/report-templates', label: '报告模板' },
     ],
   },
 ]

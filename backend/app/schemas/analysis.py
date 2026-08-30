@@ -2,7 +2,7 @@
 
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.core.enums import (
     AnalysisTaskStatus,
@@ -98,10 +98,17 @@ class RawDataOut(BaseModel):
 class AnalysisTaskCreate(BaseModel):
     name: str | None = Field(None, max_length=100)
     type: AnalysisTaskType
-    raw_data_ids: list[int] = Field(..., min_length=1, description="分析输入的原始数据")
+    raw_data_ids: list[int] = Field(default_factory=list, description="分析输入的原始数据")
+    collection_result_ids: list[int] = Field(default_factory=list, description="分析输入的自动采集结果")
     prompt_template_id: int | None = Field(None, description="提示词模板；缺省用内置模板")
     material_ids: list[int] = Field(default_factory=list, description="资料库上下文快照来源")
     output_schema: dict | None = Field(None, description="输出字段定义；缺省用内置结构")
+
+    @model_validator(mode="after")
+    def validate_inputs(self):
+        if not self.raw_data_ids and not self.collection_result_ids:
+            raise ValueError("至少选择一项分析输入")
+        return self
 
 
 class AnalysisResultOut(BaseModel):
@@ -134,6 +141,7 @@ class AnalysisTaskOut(BaseModel):
     created_at: datetime
     retry_count: int | None = 0
     raw_data_ids: list[int] = []
+    collection_result_ids: list[int] = []
     results: list[AnalysisResultOut] = []
 
 

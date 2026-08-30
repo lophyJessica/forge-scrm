@@ -28,7 +28,7 @@ from app.models.phase2 import (
     ResearchReport,
     ResearchTask,
 )
-from app.models.report import Report, ReportPushRecord, ReportPushTask
+from app.models.report import Report, ReportPushRecord, ReportPushTask, ReportTemplate
 
 __all__ = [
     "Base",
@@ -59,6 +59,7 @@ __all__ = [
     "ResearchReport",
     "ResearchReference",
     "Report",
+    "ReportTemplate",
     "ReportPushTask",
     "ReportPushRecord",
 ]

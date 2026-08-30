@@ -3,12 +3,13 @@
 本文件只描述 CRUD 输入输出；执行、重试和 AI/采集逻辑由后续步骤实现。
 """
 
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.core.enums import ContentElement, ScriptStyle, Specialty, TrustLevel
 from app.models.phase2 import (
     CollectionRecordStatus,
     CollectionTaskStatus,
@@ -16,6 +17,29 @@ from app.models.phase2 import (
     ResearchReportStatus,
     ResearchTaskStatus,
 )
+
+
+_RESEARCH_SCOPE_TYPES = {
+    "资料库",
+    "material",
+    "materials",
+    "自动采集结果",
+    "collection_result",
+    "collection_results",
+    "外部检索",
+    "external_search",
+}
+
+
+def _validate_research_scope(scope_config: dict[str, Any]) -> None:
+    raw = scope_config.get("source_types") if isinstance(scope_config, dict) else None
+    if raw is None:
+        return  # 旧任务仅含 query/max_results 等字段，保持兼容
+    if not isinstance(raw, list) or not raw:
+        raise ValueError("source_types 必须是非空数组")
+    unknown = [value for value in raw if not isinstance(value, str) or value not in _RESEARCH_SCOPE_TYPES]
+    if unknown:
+        raise ValueError(f"不支持的研究来源类型：{unknown}")
 
 
 class BenchmarkAccountCreate(BaseModel):
@@ -149,6 +173,23 @@ class CollectionResultOut(BaseModel):
     created_at: datetime
 
 
+class CollectionResultMaterialCreate(BaseModel):
+    """采集结果沉淀资料时允许用户确认的资料字段。"""
+
+    title: str | None = Field(None, min_length=1, max_length=200)
+    class_id: int
+    tags: list[str] = Field(default_factory=list)
+    trust_level: TrustLevel = TrustLevel.中
+    valid_from: date = Field(default_factory=date.today)
+    valid_until: date = Field(default_factory=lambda: date.today() + timedelta(days=365))
+
+    @model_validator(mode="after")
+    def validate_window(self):
+        if self.valid_until < self.valid_from:
+            raise ValueError("有效期止不能早于开始")
+        return self
+
+
 class ResearchTaskCreate(BaseModel):
     task_no: str | None = Field(None, min_length=1, max_length=64)
     topic: str = Field(..., min_length=1, max_length=500)
@@ -161,6 +202,7 @@ class ResearchTaskCreate(BaseModel):
     def validate_window(self):
         if self.time_window_start and self.time_window_end and self.time_window_end < self.time_window_start:
             raise ValueError("时间窗结束不能早于开始")
+        _validate_research_scope(self.scope_config)
         return self
 
 
@@ -175,6 +217,8 @@ class ResearchTaskUpdate(BaseModel):
     def validate_window(self):
         if self.time_window_start and self.time_window_end and self.time_window_end < self.time_window_start:
             raise ValueError("时间窗结束不能早于开始")
+        if self.scope_config is not None:
+            _validate_research_scope(self.scope_config)
         return self
 
 
@@ -240,3 +284,41 @@ class ResearchReferenceOut(BaseModel):
     source_type: str | None = None
     cited_at: datetime
     created_at: datetime
+
+
+class ResearchMaterializeRequest(BaseModel):
+    class_id: int
+    trust_level: TrustLevel = TrustLevel.中
+    valid_from: date = Field(default_factory=date.today)
+    valid_until: date = Field(default_factory=lambda: date.today() + timedelta(days=365))
+    section_keys: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_dates(self):
+        if self.valid_until < self.valid_from:
+            raise ValueError("有效期止不能早于有效期起")
+        return self
+
+
+class ResearchMaterializeResult(BaseModel):
+    material_ids: list[int]
+    materials: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class ResearchTopicGenerateRequest(BaseModel):
+    direction: str = Field(..., min_length=1, max_length=50)
+    specialty: Specialty
+    count: int = Field(10, ge=1, le=10)
+    material_ids: list[int] = Field(default_factory=list)
+    prompt_template_id: int | None = None
+    prompt_content: str | None = Field(None, min_length=1)
+
+
+class ResearchScriptGenerateRequest(BaseModel):
+    topic_id: int
+    style: ScriptStyle
+    content_elements: list[ContentElement] = Field(default_factory=list)
+    version_count: int = Field(3, ge=2, le=3)
+    material_ids: list[int] = Field(default_factory=list)
+    prompt_template_id: int | None = None
+    prompt_content: str | None = Field(None, min_length=1)

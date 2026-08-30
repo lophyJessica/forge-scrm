@@ -252,6 +252,86 @@ def retry_task(db: Session, task_id: int) -> CollectionTask:
     return execute_task(db, task_id, is_retry=True)
 
 
+def retry_record(db: Session, record_id: int) -> CollectionRecord:
+    """Retry one failed record without creating a second successful result."""
+
+    record = db.get(CollectionRecord, record_id)
+    if record is None:
+        raise not_found("采集记录")
+    if record.status != CollectionRecordStatus.failed or not record.retryable:
+        raise BizError("只有可重试的失败记录可以重试", code=409)
+
+    task = db.get(CollectionTask, record.task_id)
+    if task is None:
+        raise not_found("采集任务")
+    if task.status == CollectionTaskStatus.running:
+        raise BizError("采集任务正在执行，请稍后再试", code=409)
+    if record.benchmark_account_id is None:
+        raise BizError("采集记录缺少对标账号，无法重试", code=400)
+    account = db.get(BenchmarkAccount, record.benchmark_account_id)
+    if account is None:
+        raise not_found("对标账号")
+    if not account.enabled:
+        raise BizError("对标账号已停用，不能重试", code=400)
+    if _successful_record(db, task.id, account.id) is not None:
+        raise BizError("该账号已有成功采集结果，不重复生成", code=409)
+
+    previous_record = record
+    previous_record.retryable = False
+    record = CollectionRecord(
+        task_id=task.id,
+        benchmark_account_id=account.id,
+        source_type=previous_record.source_type,
+        source_url=previous_record.source_url,
+        status=CollectionRecordStatus.running,
+        attempt_no=previous_record.attempt_no + 1,
+        requested_at=utcnow(),
+    )
+    db.add(record)
+    db.flush()
+    task.status = CollectionTaskStatus.running
+    task.started_at = utcnow()
+    task.finished_at = None
+    db.commit()
+
+    try:
+        fetched = get_adapter(task, account).fetch(account, task)
+        record.status = CollectionRecordStatus.success
+        record.completed_at = utcnow()
+        record.raw_response = fetched.raw_content
+        record.source_url = fetched.source_url
+        record.http_status = fetched.http_status
+        record.item_count = fetched.item_count
+        db.add(
+            CollectionResult(
+                record_id=record.id,
+                task_id=task.id,
+                benchmark_account_id=account.id,
+                business_object="对标账号",
+                platform=account.platform,
+                account_identifier=account.account_identifier,
+                is_benchmark=account.benchmark_flag,
+                source_url=fetched.source_url,
+                raw_content=fetched.raw_content,
+                structured_data=fetched.structured_data,
+                collected_at=utcnow(),
+                window_start=task.time_window_start,
+                window_end=task.time_window_end,
+                is_ai_product=False,
+            )
+        )
+        account.last_collected_at = utcnow()
+    except CollectionAdapterError as exc:
+        _mark_record_failed(record, exc)
+    except Exception as exc:  # noqa: BLE001 - 记录级隔离
+        _mark_record_failed(record, CollectionAdapterError(f"采集执行异常：{exc}", code="COLLECTION_INTERNAL_ERROR"))
+    finally:
+        db.commit()
+
+    _refresh_task_status(db, task)
+    return record
+
+
 def _account_ids(scope_config: dict[str, Any] | None) -> list[int]:
     config = scope_config or {}
     raw_ids = config.get("benchmark_account_ids", config.get("account_ids", []))
@@ -297,6 +377,35 @@ def _successful_record(db: Session, task_id: int, account_id: int) -> Collection
         .order_by(CollectionRecord.id.desc())
     )
     return db.scalars(stmt).first()
+
+
+def _refresh_task_status(db: Session, task: CollectionTask) -> None:
+    """Recompute task counters from the latest successful account records."""
+
+    account_ids = _account_ids(task.scope_config)
+    success_ids = set(
+        db.scalars(
+            select(CollectionRecord.benchmark_account_id)
+            .where(
+                CollectionRecord.task_id == task.id,
+                CollectionRecord.status == CollectionRecordStatus.success,
+            )
+        ).all()
+    )
+    success_count = len({account_id for account_id in success_ids if account_id is not None})
+    task.total_count = len(account_ids)
+    task.success_count = success_count
+    task.failure_count = max(task.total_count - success_count, 0)
+    task.finished_at = utcnow()
+    task.status = (
+        CollectionTaskStatus.failed
+        if success_count == 0
+        else CollectionTaskStatus.partial_success
+        if task.failure_count
+        else CollectionTaskStatus.success
+    )
+    db.commit()
+    db.refresh(task)
 
 
 def _next_attempt_no(db: Session, task_id: int, account_id: int) -> int:

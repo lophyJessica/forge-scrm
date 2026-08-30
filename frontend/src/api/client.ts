@@ -2,6 +2,8 @@
 import axios, { AxiosError } from 'axios'
 import { message } from 'antd'
 
+type ErrorDetail = string | { message?: string; [key: string]: unknown }
+
 export const http = axios.create({
   baseURL: '/api',
   timeout: 300000, // 分析/生成任务一期为同步执行（D-T1），需要较长超时
@@ -19,7 +21,7 @@ http.interceptors.request.use((config) => {
 
 http.interceptors.response.use(
   (resp) => resp,
-  (error: AxiosError<{ detail?: string }>) => {
+  (error: AxiosError<{ detail?: ErrorDetail }>) => {
     const status = error.response?.status
     const detail = error.response?.data?.detail
     if (status === 401) {
@@ -29,7 +31,11 @@ http.interceptors.response.use(
       }
       return Promise.reject(error)
     }
-    message.error(detail || error.message || '请求失败')
+    const detailMessage = typeof detail === 'string' ? detail : detail?.message
+    const handledByCollectionPage = status === 409 && typeof detail === 'object' && detail?.code === 'COLLECTION_TASK_DUPLICATE'
+    if (!handledByCollectionPage) {
+      message.error(detailMessage || error.message || '请求失败')
+    }
     return Promise.reject(error)
   },
 )

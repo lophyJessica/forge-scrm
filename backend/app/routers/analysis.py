@@ -41,6 +41,7 @@ from app.models.analysis import (
 )
 from app.models.base import utcnow
 from app.models.material import Material
+from app.models.phase2 import CollectionResult
 from app.models.topic import Topic
 from app.schemas.analysis import (
     AnalysisResultOut,
@@ -381,8 +382,20 @@ def create_task(
     for r in rows:
         assert_data_source_visible(current_user, r.source_id)
 
+    collection_results = list(
+        db.scalars(select(CollectionResult).where(CollectionResult.id.in_(payload.collection_result_ids))).all()
+    )
+    missing_collection = set(payload.collection_result_ids) - {r.id for r in collection_results}
+    if missing_collection:
+        raise BizError(f"采集结果不存在：{sorted(missing_collection)}")
+
     _, _, prompt_snapshot, material_snapshot, output_schema = svc.build_prompt(
-        db, payload.type.value, rows, payload.material_ids, payload.prompt_template_id
+        db,
+        payload.type.value,
+        rows,
+        payload.material_ids,
+        payload.prompt_template_id,
+        collection_results,
     )
 
     task = AnalysisTask(
@@ -399,6 +412,8 @@ def create_task(
     db.flush()
     for rid in dict.fromkeys(payload.raw_data_ids):
         db.add(AnalysisTaskInput(task_id=task.id, raw_data_id=rid))
+    for result_id in dict.fromkeys(payload.collection_result_ids):
+        db.add(AnalysisTaskInput(task_id=task.id, collection_result_id=result_id))
     db.commit()
     db.refresh(task)
     return svc.task_to_out(db, task)
@@ -417,13 +432,15 @@ def execute_task(
     if task.status not in (AnalysisTaskStatus.待执行, AnalysisTaskStatus.失败):
         raise BizError(f"当前状态「{task.status.value}」不可执行（仅待执行/失败可执行或重试）")
 
-    raw_ids = [
-        i.raw_data_id
-        for i in db.scalars(select(AnalysisTaskInput).where(AnalysisTaskInput.task_id == task.id)).all()
-    ]
+    inputs = list(db.scalars(select(AnalysisTaskInput).where(AnalysisTaskInput.task_id == task.id)).all())
+    raw_ids = [i.raw_data_id for i in inputs if i.raw_data_id is not None]
+    collection_result_ids = [i.collection_result_id for i in inputs if i.collection_result_id is not None]
     rows = list(db.scalars(select(RawData).where(RawData.id.in_(raw_ids))).all())
-    if not rows:
-        raise BizError("任务没有可分析的原始数据")
+    collection_results = list(
+        db.scalars(select(CollectionResult).where(CollectionResult.id.in_(collection_result_ids))).all()
+    )
+    if not rows and not collection_results:
+        raise BizError("任务没有可分析的输入")
 
     material_ids = (task.material_context_snapshot or {}).get("material_ids", [])
     template_id = prompt_template_id
@@ -431,7 +448,7 @@ def execute_task(
         template_id = task.prompt_version_snapshot.get("template_id")
 
     system_prompt, user_prompt, prompt_snapshot, material_snapshot, output_schema = svc.build_prompt(
-        db, task.type.value, rows, material_ids, template_id
+        db, task.type.value, rows, material_ids, template_id, collection_results
     )
     task.status = AnalysisTaskStatus.执行中
     task.error_message = None

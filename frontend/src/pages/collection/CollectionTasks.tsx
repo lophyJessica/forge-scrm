@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type Key } from 'react'
 import { isAxiosError } from 'axios'
 import { type Dayjs } from 'dayjs'
-import { useSearchParams } from 'react-router-dom'
+import dayjs from 'dayjs'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Card, DatePicker, Descriptions, Divider, Drawer, Form, Input, Modal, Select, Space, Spin, Table, Tabs, Tag, Typography, message } from 'antd'
 import { http } from '@/api/client'
 import { TABLE_EMPTY } from '@/components/tableEmpty'
 import { FILTER_CARD_STYLE, TABLE_PAGINATION, statusTagColor } from '@/theme'
-import type { BenchmarkAccountOut, CollectionRecordOut, CollectionResultOut, CollectionTaskOut, PageResult } from '@/types'
+import { TableActions } from '@/components/TableActions'
+import type { BenchmarkAccountOut, CollectionRecordOut, CollectionResultOut, CollectionTaskOut, MaterialClassOut, PageResult, TagOut } from '@/types'
 
 const { RangePicker } = DatePicker
 
@@ -16,6 +18,25 @@ const STATUS_LABEL: Record<string, string> = {
   success: '已完成',
   partial_success: '部分成功',
   failed: '失败',
+}
+
+const RECORD_STATUS_LABEL: Record<string, string> = {
+  pending: '待执行',
+  running: '执行中',
+  success: '已完成',
+  failed: '失败',
+}
+
+type DuplicateDetail = {
+  code?: string
+  message?: string
+  existing_task?: {
+    id: number
+    task_no: string
+    status: string
+    result_count: number
+    created_at?: string
+  }
 }
 
 function formatTime(value?: string | null) {
@@ -72,30 +93,58 @@ function ResultDetail({ result }: { result: CollectionResultOut }) {
   )
 }
 
-function TaskDetails({ taskId, onOpenResult }: { taskId: number; onOpenResult: (result: CollectionResultOut) => void }) {
+function TaskDetails({
+  taskId,
+  onOpenResult,
+  onMaterialize,
+  onUseForAnalysis,
+}: {
+  taskId: number
+  onOpenResult: (result: CollectionResultOut) => void
+  onMaterialize: (result: CollectionResultOut) => void
+  onUseForAnalysis: (result: CollectionResultOut) => void
+}) {
   const [records, setRecords] = useState<CollectionRecordOut[]>([])
   const [results, setResults] = useState<CollectionResultOut[]>([])
   const [loading, setLoading] = useState(true)
+  const [retryingRecord, setRetryingRecord] = useState<number | null>(null)
+  const [activeTab, setActiveTab] = useState('records')
 
-  useEffect(() => {
-    let active = true
-    Promise.all([
-      loadNestedOrFlat<CollectionRecordOut>(`/collection-tasks/${taskId}/records`, '/collection-records', { task_id: taskId }),
-      loadNestedOrFlat<CollectionResultOut>(`/collection-tasks/${taskId}/results`, '/collection-results', { task_id: taskId }),
-    ]).then(([recordRows, resultRows]) => {
-      if (!active) return
+  const loadDetails = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [recordRows, resultRows] = await Promise.all([
+        loadNestedOrFlat<CollectionRecordOut>(`/collection-tasks/${taskId}/records`, '/collection-records', { task_id: taskId }),
+        loadNestedOrFlat<CollectionResultOut>(`/collection-tasks/${taskId}/results`, '/collection-results', { task_id: taskId }),
+      ])
       setRecords(recordRows)
       setResults(resultRows)
-    }).finally(() => {
-      if (active) setLoading(false)
-    })
-    return () => { active = false }
+    } finally {
+      setLoading(false)
+    }
   }, [taskId])
+
+  useEffect(() => {
+    void loadDetails()
+  }, [loadDetails])
+
+  const retryRecord = async (recordId: number) => {
+    setRetryingRecord(recordId)
+    try {
+      await http.post<CollectionRecordOut>(`/collection/records/${recordId}/retry`)
+      message.success('采集记录已重试')
+      await loadDetails()
+    } finally {
+      setRetryingRecord(null)
+    }
+  }
 
   if (loading) return <Spin />
 
   return (
     <Tabs
+      activeKey={activeTab}
+      onChange={setActiveTab}
       items={[
         {
           key: 'records',
@@ -110,12 +159,23 @@ function TaskDetails({ taskId, onOpenResult }: { taskId: number; onOpenResult: (
               scroll={{ x: 900 }}
               columns={[
                 { title: '账号 ID', dataIndex: 'benchmark_account_id', width: 90 },
-                { title: '状态', dataIndex: 'status', width: 90, render: (value: string) => <Tag color={statusTagColor(value === 'success' ? '已完成' : value === 'failed' ? '失败' : value === 'running' ? '执行中' : value)}>{value}</Tag> },
+                { title: '状态', dataIndex: 'status', width: 90, render: (value: string) => <Tag color={statusTagColor(RECORD_STATUS_LABEL[value] || value)}>{RECORD_STATUS_LABEL[value] || value}</Tag> },
                 { title: '尝试次数', dataIndex: 'attempt_no', width: 90 },
                 { title: '条目数', dataIndex: 'item_count', width: 80 },
                 { title: 'HTTP', dataIndex: 'http_status', width: 80, render: (value: number | null) => value || '—' },
+                { title: '错误码', dataIndex: 'error_code', width: 140, render: (value: string | null) => value || '—' },
                 { title: '错误', dataIndex: 'error_message', ellipsis: true, render: (value: string | null) => value || '—' },
                 { title: '完成时间', dataIndex: 'completed_at', width: 180, render: (value: string | null) => formatTime(value) },
+                {
+                  title: '操作',
+                  width: 90,
+                  fixed: 'right',
+                  render: (_, record) => record.status === 'failed' && record.retryable ? (
+                    <Button size="small" loading={retryingRecord === record.id} onClick={() => retryRecord(record.id)}>
+                      重试
+                    </Button>
+                  ) : null,
+                },
               ]}
             />
           ),
@@ -138,7 +198,20 @@ function TaskDetails({ taskId, onOpenResult }: { taskId: number; onOpenResult: (
                 { title: '原始内容', dataIndex: 'raw_content', ellipsis: true, render: (value: string) => <Typography.Text ellipsis={{ tooltip: value }}>{value}</Typography.Text> },
                 { title: 'AI 产物', dataIndex: 'is_ai_product', width: 90, render: (value: boolean) => value ? <Tag color="purple">是</Tag> : <Tag>否</Tag> },
                 { title: '采集时间', dataIndex: 'collected_at', width: 180, render: (value: string) => formatTime(value) },
-                { title: '操作', width: 80, fixed: 'right', render: (_, result) => <Button size="small" onClick={() => onOpenResult(result)}>详情</Button> },
+                {
+                  title: '操作',
+                  width: 220,
+                  fixed: 'right',
+                  render: (_, result) => (
+                    <TableActions
+                      items={[
+                        <Button key="detail" size="small" onClick={() => onOpenResult(result)}>详情</Button>,
+                        <Button key="material" size="small" onClick={() => onMaterialize(result)}>沉淀为资料</Button>,
+                        <Button key="analysis" size="small" onClick={() => onUseForAnalysis(result)}>作为分析输入</Button>,
+                      ]}
+                    />
+                  ),
+                },
               ]}
             />
           ),
@@ -150,16 +223,22 @@ function TaskDetails({ taskId, onOpenResult }: { taskId: number; onOpenResult: (
 
 export default function CollectionTasks() {
   const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
   const [queryForm] = Form.useForm()
   const [form] = Form.useForm()
   const [rows, setRows] = useState<CollectionTaskOut[]>([])
   const [accounts, setAccounts] = useState<BenchmarkAccountOut[]>([])
+  const [classes, setClasses] = useState<MaterialClassOut[]>([])
+  const [tags, setTags] = useState<TagOut[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false)
   const [running, setRunning] = useState<number | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [resultDetail, setResultDetail] = useState<CollectionResultOut | null>(null)
+  const [materialTarget, setMaterialTarget] = useState<CollectionResultOut | null>(null)
+  const [expandedRowKeys, setExpandedRowKeys] = useState<Key[]>([])
+  const [materialForm] = Form.useForm()
 
   const load = useCallback(async (targetPage = 1) => {
     setLoading(true)
@@ -177,7 +256,15 @@ export default function CollectionTasks() {
 
   useEffect(() => {
     void load(1)
-    void http.get<PageResult<BenchmarkAccountOut>>('/benchmark-accounts', { params: { enabled: true, page_size: 200 } }).then((response) => setAccounts(response.data.items))
+    void Promise.all([
+      http.get<PageResult<BenchmarkAccountOut>>('/benchmark-accounts', { params: { enabled: true, page_size: 200 } }),
+      http.get<MaterialClassOut[]>('/material-classes'),
+      http.get<TagOut[]>('/tags'),
+    ]).then(([accountResponse, classResponse, tagResponse]) => {
+      setAccounts(accountResponse.data.items)
+      setClasses(classResponse.data)
+      setTags(tagResponse.data)
+    })
   }, [load])
 
   useEffect(() => {
@@ -204,6 +291,22 @@ export default function CollectionTasks() {
     setModalOpen(true)
   }
 
+  const openMaterialModal = (result: CollectionResultOut) => {
+    if (classes.length === 0) {
+      message.warning('暂无可用资料分类，无法沉淀')
+      return
+    }
+    materialForm.resetFields()
+    materialForm.setFieldsValue({
+      material_title: `${result.account_identifier || '采集结果'} #${result.id}`,
+      material_class_id: classes[0]?.id,
+      material_tags: [],
+      material_trust_level: '中',
+      material_valid_range: [dayjs(), dayjs().add(1, 'year')],
+    })
+    setMaterialTarget(result)
+  }
+
   const create = async () => {
     const values = await form.validateFields()
     let publicUrls: Record<string, string> | undefined
@@ -218,18 +321,53 @@ export default function CollectionTasks() {
       }
     }
     const [start, end] = values.time_range as [Dayjs, Dayjs]
-    await http.post('/collection-tasks', {
-      scope_type: 'benchmark_account',
-      scope_config: {
-        benchmark_account_ids: values.account_ids,
-        ...(publicUrls ? { public_urls: publicUrls } : {}),
-      },
-      time_window_start: start.format('YYYY-MM-DDTHH:mm:ss'),
-      time_window_end: end.format('YYYY-MM-DDTHH:mm:ss'),
-    })
+    try {
+      await http.post('/collection-tasks', {
+        scope_type: 'benchmark_account',
+        scope_config: {
+          benchmark_account_ids: values.account_ids,
+          ...(publicUrls ? { public_urls: publicUrls } : {}),
+        },
+        time_window_start: start.format('YYYY-MM-DDTHH:mm:ss'),
+        time_window_end: end.format('YYYY-MM-DDTHH:mm:ss'),
+      })
+    } catch (error) {
+      if (!isAxiosError<{ detail?: DuplicateDetail }>(error) || error.response?.status !== 409) throw error
+      const duplicate = error.response.data?.detail
+      const existing = typeof duplicate === 'object' ? duplicate.existing_task : undefined
+      if (!existing) throw error
+      Modal.confirm({
+        title: '发现相同采集任务',
+        content: `任务 ${existing.task_no} 当前为${STATUS_LABEL[existing.status] || existing.status}，创建于 ${formatTime(existing.created_at)}，已有 ${existing.result_count} 条结果。`,
+        okText: '查看旧任务',
+        cancelText: '关闭',
+        onOk: async () => {
+          setModalOpen(false)
+          await load(1)
+          setExpandedRowKeys([existing.id])
+        },
+      })
+      return
+    }
     message.success('采集任务已创建')
     setModalOpen(false)
     void load(1)
+  }
+
+  const materialize = async () => {
+    if (!materialTarget) return
+    const values = await materialForm.validateFields()
+    const [validFrom, validUntil] = values.material_valid_range as [Dayjs, Dayjs]
+    await http.post(`/collection-results/${materialTarget.id}/material`, {
+      title: values.material_title,
+      class_id: values.material_class_id,
+      tags: values.material_tags || [],
+      trust_level: values.material_trust_level,
+      valid_from: validFrom.format('YYYY-MM-DD'),
+      valid_until: validUntil.format('YYYY-MM-DD'),
+    })
+    message.success('已沉淀为资料草稿')
+    setMaterialTarget(null)
   }
 
   const execute = async (row: CollectionTaskOut) => {
@@ -263,7 +401,18 @@ export default function CollectionTasks() {
         rowKey="id"
         loading={loading}
         dataSource={rows}
-        expandable={{ expandedRowRender: (row) => <TaskDetails taskId={row.id} onOpenResult={setResultDetail} /> }}
+        expandable={{
+          expandedRowKeys,
+          onExpandedRowsChange: (keys) => setExpandedRowKeys([...keys]),
+          expandedRowRender: (row) => (
+            <TaskDetails
+              taskId={row.id}
+              onOpenResult={(result) => setResultDetail(result)}
+              onMaterialize={openMaterialModal}
+              onUseForAnalysis={(result) => navigate(`/analysis/tasks?collection_result_id=${result.id}`)}
+            />
+          ),
+        }}
         pagination={{ ...TABLE_PAGINATION, current: page, total, pageSize: 20, onChange: (nextPage) => load(nextPage) }}
         scroll={{ x: 1050 }}
         columns={[
@@ -296,6 +445,26 @@ export default function CollectionTasks() {
           </Form.Item>
           <Form.Item name="public_urls" label="public_urls（可选 JSON）" extra="键可使用账号 ID 或账号标识；留空时使用账号公开主页 URL。">
             <Input.TextArea rows={4} placeholder={'例如：{"12":"https://example.com/public.json"}'} />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal open={!!materialTarget} title="沉淀为资料" width={720} onCancel={() => setMaterialTarget(null)} onOk={materialize} okText="保存资料" cancelText="取消">
+        <Form form={materialForm} layout="vertical">
+          <Form.Item name="material_title" label="资料标题" rules={[{ required: true, message: '请输入资料标题' }]}>
+            <Input maxLength={200} />
+          </Form.Item>
+          <Form.Item name="material_class_id" label="资料分类" rules={[{ required: true, message: '请选择资料分类' }]}>
+            <Select options={classes.map((item) => ({ label: item.name, value: item.id }))} />
+          </Form.Item>
+          <Form.Item name="material_tags" label="标签">
+            <Select mode="tags" options={tags.map((item) => ({ label: item.name, value: item.name }))} placeholder="可输入或选择标签" />
+          </Form.Item>
+          <Form.Item name="material_trust_level" label="可信度" rules={[{ required: true }]}>
+            <Select options={['高', '中', '低'].map((value) => ({ label: value, value }))} />
+          </Form.Item>
+          <Form.Item name="material_valid_range" label="有效期" rules={[{ required: true, message: '请选择有效期' }]}>
+            <RangePicker style={{ width: '100%' }} />
           </Form.Item>
         </Form>
       </Modal>

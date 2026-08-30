@@ -7,7 +7,7 @@
 from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, JSON, Numeric, String
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, JSON, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models._enum_type import enum_type
@@ -243,7 +243,11 @@ class CollectionRecord(Base):
 
 class CollectionResult(Base):
     __tablename__ = "collection_result"
-    __table_args__ = (Index("idx_collection_result_task", "task_id"),)
+    __table_args__ = (
+        Index("idx_collection_result_task", "task_id"),
+        UniqueConstraint("record_id", name="uk_collection_result_record"),
+        UniqueConstraint("task_id", "benchmark_account_id", name="uk_collection_result_task_account"),
+    )
 
     id: Mapped[int] = pk_column()
     record_id: Mapped[int] = mapped_column(
