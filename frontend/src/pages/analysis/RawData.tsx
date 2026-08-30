@@ -136,7 +136,7 @@ export default function RawData() {
             label: '数据列表',
             children: (
               <>
-                <Form form={queryForm} layout="inline" style={{ marginBottom: 16 }} onFinish={() => load(1)}>
+                <Form form={queryForm} layout="inline" style={{ marginBottom: 24 }} onFinish={() => load(1)}>
                   <Form.Item name="source_id">
                     <Select
                       allowClear
@@ -215,7 +215,7 @@ export default function RawData() {
                   style={{ marginBottom: 16 }}
                   message="一期采用固定模板导入：请先下载模板，按列名填写后上传；失败行会逐行给出原因，成功行照常入库。"
                 />
-                <Space style={{ marginBottom: 16 }}>
+                <Space style={{ marginBottom: 24 }}>
                   <Button onClick={downloadTemplate}>下载导入模板</Button>
                   <Upload
                     accept=".csv,.txt"

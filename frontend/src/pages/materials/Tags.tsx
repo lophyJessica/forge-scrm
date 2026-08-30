@@ -47,7 +47,7 @@ export default function Tags() {
         </Form>
       )}
 
-      <Space style={{ marginBottom: 16 }}>
+      <Space style={{ marginBottom: 24 }}>
         <Input.Search placeholder="搜索标签" onSearch={(v) => load(v)} style={{ width: 260 }} allowClear />
       </Space>
 

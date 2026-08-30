@@ -14,6 +14,7 @@ import { Badge, Button, Card, Col, List, Row, Space, Statistic, Tag, Typography 
 import dayjs from 'dayjs'
 import { http } from '@/api/client'
 import { useAuthStore } from '@/store/auth'
+import { displayStatus } from '@/theme'
 import type {
   AnalysisTaskOut,
   MaterialOut,
@@ -48,7 +49,7 @@ const EMPTY_STATS: StatCard[] = [
   { key: 'materials', title: '资料总数', total: null, sub: '已生效 --' },
   { key: 'topics', title: '选题总数', total: null, sub: '待筛选 --' },
   { key: 'scripts', title: '脚本总数', total: null, sub: '已通过 --' },
-  { key: 'analysis', title: '分析任务数', total: null, sub: '待审核 --' },
+  { key: 'analysis', title: '分析任务数', total: null, sub: '详情查看执行状态' },
 ]
 
 async function safeTotal(path: string, params?: Record<string, string | number>): Promise<number | null> {
@@ -88,10 +89,6 @@ export default function Home() {
         scriptTotal,
         scriptApproved,
         analysisTotal,
-        analysisPending,
-        pendingMat,
-        pendingTopic,
-        pendingScript,
         recentTopics,
         recentScripts,
         recentMaterials,
@@ -104,10 +101,6 @@ export default function Home() {
         safeTotal('/scripts'),
         safeTotal('/scripts', { status: '已通过' }),
         safeTotal('/analysis-tasks'),
-        safeTotal('/analysis-tasks', { status: '待审核' }),
-        safeTotal('/materials', { status: '待审核' }),
-        safeTotal('/topics', { status: '待筛选' }),
-        safeTotal('/scripts', { status: '待审核' }),
         safeItems<TopicOut>('/topics'),
         safeItems<ScriptOut>('/scripts'),
         safeItems<MaterialOut>('/materials'),
@@ -137,19 +130,13 @@ export default function Home() {
           key: 'analysis',
           title: '分析任务数',
           total: analysisTotal,
-          sub: analysisPending !== null ? `待审核 ${analysisPending}` : '待审核 --',
+          sub: '详情查看执行状态',
         },
       ])
 
       const todoList: TodoItem[] = []
-      if (pendingMat !== null && pendingMat > 0) {
-        todoList.push({ key: 'mat', label: '待审核资料', count: pendingMat, path: '/materials/review' })
-      }
-      if (pendingTopic !== null && pendingTopic > 0) {
-        todoList.push({ key: 'topic', label: '待筛选选题', count: pendingTopic, path: '/topics' })
-      }
-      if (pendingScript !== null && pendingScript > 0) {
-        todoList.push({ key: 'script', label: '待审核脚本', count: pendingScript, path: '/scripts/review' })
+      if (topicPending !== null && topicPending > 0) {
+        todoList.push({ key: 'topic', label: '待筛选选题', count: topicPending, path: '/topics' })
       }
       setTodos(todoList)
 
@@ -168,8 +155,8 @@ export default function Home() {
       recentScripts.forEach((s) => {
         const desc =
           s.status === '已通过' && s.reviewed_at
-            ? `脚本已通过审核（#${s.id}）`
-            : `脚本更新（#${s.id}，${s.status}）`
+            ? `脚本已通过（#${s.id}）`
+            : `脚本更新（#${s.id}，${displayStatus(s.status, '已通过')}）`
         acts.push({
           key: `script-${s.id}`,
           icon: <FileTextOutlined style={{ color: '#1677ff' }} />,
@@ -182,7 +169,7 @@ export default function Home() {
         acts.push({
           key: `mat-${m.id}`,
           icon: <FileAddOutlined style={{ color: '#52c41a' }} />,
-          description: `资料「${m.title}」（${m.status}）`,
+          description: `资料「${m.title}」（${displayStatus(m.status, '已生效')}）`,
           time: dayjs(m.created_at).format('MM-DD HH:mm'),
           sortAt: dayjs(m.created_at).valueOf(),
         })
@@ -191,7 +178,7 @@ export default function Home() {
         acts.push({
           key: `task-${task.id}`,
           icon: <CheckCircleOutlined style={{ color: '#722ed1' }} />,
-          description: `分析任务「${task.name || task.type}」（${task.status}）`,
+          description: `分析任务「${task.name || task.type}」（${displayStatus(task.status, '已确认')}）`,
           time: dayjs(task.created_at).format('MM-DD HH:mm'),
           sortAt: dayjs(task.created_at).valueOf(),
         })

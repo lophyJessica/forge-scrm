@@ -19,7 +19,7 @@ import { TABLE_EMPTY } from '@/components/tableEmpty'
 import { TableActions } from '@/components/TableActions'
 import { useAuthStore } from '@/store/auth'
 import { PERM, useMetaStore } from '@/store/meta'
-import { TABLE_PAGINATION, statusTagColor } from '@/theme'
+import { TABLE_PAGINATION, displayStatus, statusTagColor, visibleStatusOptions } from '@/theme'
 import type { MaterialClassOut, MaterialOut, PageResult, TagOut } from '@/types'
 
 export default function MaterialList() {
@@ -80,7 +80,7 @@ export default function MaterialList() {
         </Space>
       }
     >
-      <Form form={form} layout="inline" style={{ marginBottom: 16 }} onFinish={() => load(1)}>
+      <Form form={form} layout="inline" style={{ marginBottom: 24 }} onFinish={() => load(1)}>
         <Form.Item name="keyword">
           <Input allowClear placeholder="标题/正文关键词" style={{ width: 220 }} />
         </Form.Item>
@@ -102,7 +102,7 @@ export default function MaterialList() {
           />
         </Form.Item>
         <Form.Item name="status">
-          <Select allowClear placeholder="状态" style={{ width: 130 }} options={options('material_status')} />
+          <Select allowClear placeholder="状态" style={{ width: 130 }} options={visibleStatusOptions(options('material_status'))} />
         </Form.Item>
         <Form.Item>
           <Space>
@@ -158,7 +158,10 @@ export default function MaterialList() {
             title: '状态',
             dataIndex: 'status',
             width: 90,
-            render: (v: string) => <Tag color={statusTagColor(v)}>{v}</Tag>,
+            render: (v: string) => {
+              const label = displayStatus(v, '已生效')
+              return <Tag color={statusTagColor(label)}>{label}</Tag>
+            },
           },
           {
             title: '操作',
@@ -169,11 +172,6 @@ export default function MaterialList() {
                   <Button key="edit" size="small" onClick={() => navigate(`/materials/${r.id}`)}>
                     编辑
                   </Button>,
-                  r.status === '草稿' ? (
-                    <Button key="submit" size="small" onClick={() => act(r.id, 'submit')}>
-                      提交审核
-                    </Button>
-                  ) : null,
                   r.status === '已生效' ? (
                     <Button key="disable" size="small" onClick={() => act(r.id, 'disable')}>
                       停用
@@ -219,7 +217,7 @@ export default function MaterialList() {
         onCancel={() => setDetail(null)}
       >
         <p>
-          分类：{detail?.class_name}　状态：{detail?.status}　可信度：{detail?.trust_level}
+          分类：{detail?.class_name}　状态：{displayStatus(detail?.status, '已生效')}　可信度：{detail?.trust_level}
         </p>
         <p>
           有效期：{detail?.valid_from} ~ {detail?.valid_until}

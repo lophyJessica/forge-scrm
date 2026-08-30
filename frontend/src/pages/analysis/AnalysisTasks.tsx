@@ -6,7 +6,7 @@ import { TABLE_EMPTY } from '@/components/tableEmpty'
 import { TableActions } from '@/components/TableActions'
 import { useAuthStore } from '@/store/auth'
 import { PERM, useMetaStore } from '@/store/meta'
-import { TABLE_PAGINATION, statusTagColor } from '@/theme'
+import { TABLE_PAGINATION, displayStatus, statusTagColor, visibleStatusOptions } from '@/theme'
 import type { AnalysisTaskOut, MaterialOut, PageResult, PromptTemplateOut, RawDataOut } from '@/types'
 
 export default function AnalysisTasks() {
@@ -73,7 +73,7 @@ export default function AnalysisTasks() {
     try {
       // D-T1：同步执行；失败时后端返回 400，错误详情由 http 拦截器统一提示
       await http.post<AnalysisTaskOut>(`/analysis-tasks/${id}/execute`)
-      message.success('执行完成，结果待人工审核')
+      message.success('执行完成')
     } finally {
       setRunning(null)
       void load(page)
@@ -103,12 +103,12 @@ export default function AnalysisTasks() {
         style={{ marginBottom: 16 }}
         message="一期为同步执行：点击「执行」后请等待返回（AI 调用失败自动重试 3 次），不做异步队列与通知。"
       />
-      <Form form={queryForm} layout="inline" style={{ marginBottom: 16 }} onFinish={() => load(1)}>
+      <Form form={queryForm} layout="inline" style={{ marginBottom: 24 }} onFinish={() => load(1)}>
         <Form.Item name="type">
           <Select allowClear placeholder="任务类型" style={{ width: 180 }} options={options('analysis_task_type')} />
         </Form.Item>
         <Form.Item name="status">
-          <Select allowClear placeholder="状态" style={{ width: 140 }} options={options('analysis_task_status')} />
+          <Select allowClear placeholder="状态" style={{ width: 140 }} options={visibleStatusOptions(options('analysis_task_status'))} />
         </Form.Item>
         <Form.Item>
           <Button type="primary" htmlType="submit">
@@ -136,7 +136,10 @@ export default function AnalysisTasks() {
             title: '状态',
             dataIndex: 'status',
             width: 110,
-            render: (v: string) => <Tag color={statusTagColor(v)}>{v}</Tag>,
+            render: (v: string) => {
+              const label = displayStatus(v, '已确认')
+              return <Tag color={statusTagColor(label)}>{label}</Tag>
+            },
           },
           { title: '重试次数', dataIndex: 'retry_count', width: 100 },
           { title: '创建时间', dataIndex: 'created_at', width: 190 },

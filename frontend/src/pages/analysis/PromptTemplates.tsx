@@ -94,7 +94,7 @@ export default function PromptTemplates() {
         style={{ marginBottom: 16 }}
         message="一期不设独立版本表：模板正文变更时版本号自动 +1，历史正文由使用它的任务/选题的「版本快照」留存。分析类模板必须填写输出字段定义。"
       />
-      <Form form={queryForm} layout="inline" style={{ marginBottom: 16 }} onFinish={() => load()}>
+      <Form form={queryForm} layout="inline" style={{ marginBottom: 24 }} onFinish={() => load()}>
         <Form.Item name="task_type">
           <Select allowClear placeholder="任务类型" style={{ width: 180 }} options={options('prompt_task_type')} />
         </Form.Item>

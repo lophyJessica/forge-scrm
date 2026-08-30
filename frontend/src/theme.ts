@@ -98,6 +98,16 @@ export function statusTagColor(status?: string | null): string {
   return STATUS_TAG_COLOR[status] ?? 'default'
 }
 
+/** 将后端保留状态映射为二期默认通过后的用户可见状态。 */
+export function displayStatus(status: string | null | undefined, defaultStatus: string): string {
+  return status === '待审核' ? defaultStatus : status || '—'
+}
+
+/** 状态筛选不展示后端预留状态，但保留其它筛选值与查询参数。 */
+export function visibleStatusOptions<T extends { value: string }>(options: T[]): T[] {
+  return options.filter((option) => option.value !== '待审核')
+}
+
 export const TABLE_PAGINATION = {
   position: ['bottomRight'] as ('bottomRight')[],
   showSizeChanger: false,

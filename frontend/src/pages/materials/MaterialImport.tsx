@@ -21,7 +21,7 @@ export default function MaterialImport() {
         showIcon
         style={{ marginBottom: 16 }}
         message="一期为固定模板导入"
-        description="请先下载模板，按列填写后上传。必填列：标题、内容、分类、来源类型、可信度、有效期起、有效期止；标签多个用 | 分隔。导入成功的资料进入「待审核」，需审核通过后才能被引用。"
+        description="请先下载模板，按列填写后上传。必填列：标题、内容、分类、来源类型、可信度、有效期起、有效期止；标签多个用 | 分隔。导入成功的资料会按系统默认规则保存，可在资料列表中查看。"
       />
       <Space style={{ marginBottom: 16 }}>
         <Button icon={<DownloadOutlined />} onClick={getTemplate}>

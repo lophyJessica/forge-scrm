@@ -94,7 +94,7 @@ export default function ResearchTasks() {
 
   return (
     <Card title="研究助手" extra={<Button type="primary" onClick={() => { form.resetFields(); setModalOpen(true) }}>新建研究任务</Button>}>
-      <Form form={queryForm} layout="inline" style={{ marginBottom: 16 }} onFinish={() => load(1)}>
+      <Form form={queryForm} layout="inline" style={{ marginBottom: 24 }} onFinish={() => load(1)}>
         <Form.Item name="status">
           <Select allowClear placeholder="任务状态" style={{ width: 150 }} options={Object.keys(STATUS_LABEL).map((value) => ({ label: STATUS_LABEL[value], value }))} />
         </Form.Item>

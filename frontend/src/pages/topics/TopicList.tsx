@@ -62,7 +62,7 @@ export default function TopicList() {
         </Space>
       }
     >
-      <Form form={form} layout="inline" style={{ marginBottom: 16 }} onFinish={() => load(1)}>
+      <Form form={form} layout="inline" style={{ marginBottom: 24 }} onFinish={() => load(1)}>
         <Form.Item name="keyword">
           <Input allowClear placeholder="标题关键词" style={{ width: 200 }} />
         </Form.Item>

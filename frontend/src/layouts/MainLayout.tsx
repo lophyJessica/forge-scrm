@@ -72,8 +72,6 @@ const NAV_GROUPS: MenuGroupDefinition[] = [
       { key: '/materials', label: '资料列表' },
       { key: '/materials/new', label: '新建资料' },
       { key: '/materials/import', label: '批量导入' },
-      // 二期默认通过，资料审核入口暂时隐藏；路由与页面保留，便于后续重新启用。
-      // { key: '/materials/review', label: '资料审核' },
       { key: '/material-classes', label: '分类管理' },
       { key: '/tags', label: '标签管理' },
     ],
@@ -99,7 +97,6 @@ const NAV_GROUPS: MenuGroupDefinition[] = [
       { key: '/scripts', label: '脚本列表' },
       { key: '/scripts/generate', label: '基于选题生成' },
       { key: '/scripts/new', label: '独立创建' },
-      { key: '/scripts/review', label: '脚本审核' },
     ],
   },
   {

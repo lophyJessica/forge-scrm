@@ -64,7 +64,7 @@ export default function BenchmarkAccounts() {
 
   return (
     <Card title="对标账号" extra={<Button type="primary" onClick={() => openModal()}>新建账号</Button>}>
-      <Form form={queryForm} layout="inline" style={{ marginBottom: 16 }} onFinish={() => load(1)}>
+      <Form form={queryForm} layout="inline" style={{ marginBottom: 24 }} onFinish={() => load(1)}>
         <Form.Item name="platform">
           <Input allowClear placeholder="平台" style={{ width: 150 }} />
         </Form.Item>

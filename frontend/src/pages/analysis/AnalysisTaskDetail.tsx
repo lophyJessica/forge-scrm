@@ -20,7 +20,7 @@ import dayjs from 'dayjs'
 import { http } from '@/api/client'
 import { useAuthStore } from '@/store/auth'
 import { PERM, useMetaStore } from '@/store/meta'
-import { statusTagColor } from '@/theme'
+import { displayStatus, statusTagColor } from '@/theme'
 import type { AnalysisResultOut, AnalysisTaskOut, MaterialClassOut } from '@/types'
 
 export default function AnalysisTaskDetail() {
@@ -54,17 +54,11 @@ export default function AnalysisTaskDetail() {
     try {
       // D-T1：同步执行；失败时后端返回 400，错误详情由 http 拦截器统一提示
       await http.post<AnalysisTaskOut>(`/analysis-tasks/${id}/execute`)
-      message.success('执行完成，结果待人工审核')
+      message.success('执行完成')
     } finally {
       setRunning(false)
       void load()
     }
-  }
-
-  const review = async (approved: boolean) => {
-    await http.post(`/analysis-tasks/${id}/review`, { approved })
-    message.success(approved ? '已确认' : '已驳回')
-    void load()
   }
 
   const showRaw = async () => {
@@ -103,7 +97,7 @@ export default function AnalysisTaskDetail() {
       tags: m.tags || [],
     }))
     await http.post(`/analysis-results/${matTarget!.id}/writeback-material`, { materials })
-    message.success('已回写资料库（产物为「待审核」，需按流程审核）')
+    message.success('已回写资料库')
     setMatTarget(null)
     void load()
   }
@@ -126,6 +120,8 @@ export default function AnalysisTaskDetail() {
     void load()
   }
 
+  const statusLabel = displayStatus(task.status, '已确认')
+
   return (
     <Card
       title={`分析任务 #${task.id}：${task.name || '未命名'}`}
@@ -138,33 +134,13 @@ export default function AnalysisTaskDetail() {
               {task.status === '失败' ? '重新执行' : '执行'}
             </Button>
           )}
-          {task.status === '待审核' && can(PERM.分析结果审核) && (
-            <>
-              <Button type="primary" onClick={() => review(true)}>
-                确认结果
-              </Button>
-              <Button
-                danger
-                onClick={() => Modal.confirm({
-                  title: '确认驳回？',
-                  content: '驳回后本次分析结果将不再用于回写或反哺。',
-                  okText: '确认驳回',
-                  okType: 'danger',
-                  cancelText: '取消',
-                  onOk: () => review(false),
-                })}
-              >
-                驳回
-              </Button>
-            </>
-          )}
         </Space>
       }
     >
       <Descriptions column={2} bordered size="small">
         <Descriptions.Item label="任务类型">{task.type}</Descriptions.Item>
         <Descriptions.Item label="状态">
-          <Tag color={statusTagColor(task.status)}>{task.status}</Tag>
+          <Tag color={statusTagColor(statusLabel)}>{statusLabel}</Tag>
         </Descriptions.Item>
         <Descriptions.Item label="重试次数">{task.retry_count ?? 0}</Descriptions.Item>
         <Descriptions.Item label="创建时间">{task.created_at}</Descriptions.Item>
@@ -190,14 +166,6 @@ export default function AnalysisTaskDetail() {
       )}
 
       <Divider orientation="left">分析结果</Divider>
-      {task.status !== '已确认' && task.results.length > 0 && (
-        <Alert
-          type="warning"
-          showIcon
-          style={{ marginBottom: 12 }}
-          message="分析结果需人工确认后，才能回写资料库或反哺选题库。"
-        />
-      )}
       <List
         dataSource={task.results}
         locale={{ emptyText: '暂无结果，请先执行任务' }}
@@ -254,7 +222,7 @@ export default function AnalysisTaskDetail() {
           type="info"
           showIcon
           style={{ marginBottom: 12 }}
-          message="回写产物标记为 AI 产物且状态为「待审核」，必须经人工审核后才生效。"
+          message="回写产物会保留 AI 产物标记，资料状态沿用系统默认规则。"
         />
         <Form form={matForm} layout="vertical">
           <Form.List name="materials">
@@ -301,7 +269,7 @@ export default function AnalysisTaskDetail() {
           type="info"
           showIcon
           style={{ marginBottom: 12 }}
-          message="反哺产物状态为「待筛选」，需在选题库中人工筛选后才能使用。"
+          message="反哺产物状态为「待筛选」，请在选题库中确认后使用。"
         />
         <Form form={topicForm} layout="vertical">
           <Form.List name="topics">

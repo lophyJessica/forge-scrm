@@ -15,7 +15,7 @@ export default function MaterialForm() {
   const [classes, setClasses] = useState<MaterialClassOut[]>([])
   const [tags, setTags] = useState<TagOut[]>([])
   const [materialStatus, setMaterialStatus] = useState<string>()
-  const [savingAction, setSavingAction] = useState<'draft' | 'review' | 'save'>()
+  const [savingAction, setSavingAction] = useState<'draft' | 'save'>()
 
   useEffect(() => {
     void http.get<MaterialClassOut[]>('/material-classes').then((r) => setClasses(r.data))
@@ -42,7 +42,7 @@ export default function MaterialForm() {
     return status === '已生效'
   }
 
-  const submit = async (action: 'draft' | 'review' | 'save') => {
+  const submit = async (action: 'draft' | 'save') => {
     const values = await form.validateFields()
     const validRange = values.valid_range
     const payload = {
@@ -65,9 +65,7 @@ export default function MaterialForm() {
       let isActive = false
       if (isEdit) {
         await http.put(`/materials/${id}`, payload)
-        if (action === 'review' && materialStatus === '草稿') {
-          await http.post(`/materials/${id}/submit`)
-        } else if (action === 'save') {
+        if (action === 'save') {
           isActive = await activate(Number(id), materialStatus)
         }
       } else {
@@ -82,11 +80,9 @@ export default function MaterialForm() {
       message.success(
         action === 'draft'
           ? '已存为草稿'
-          : action === 'review'
-            ? '已提交审核'
-            : isActive
-              ? '保存成功，资料已生效'
-              : '保存成功',
+          : isActive
+            ? '保存成功，资料已生效'
+            : '保存成功',
       )
       navigate('/materials')
     } finally {

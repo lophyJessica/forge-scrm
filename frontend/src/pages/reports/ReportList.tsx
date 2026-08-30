@@ -303,7 +303,7 @@ export default function ReportList() {
         </Button>
       )}
     >
-      <Form form={queryForm} layout="inline" style={{ marginBottom: 16 }} onFinish={() => load(1)}>
+      <Form form={queryForm} layout="inline" style={{ marginBottom: 24 }} onFinish={() => load(1)}>
         <Form.Item name="report_type">
           <Select allowClear placeholder="报告类型" style={{ width: 180 }} options={REPORT_TYPES.map((value) => ({ label: value, value }))} />
         </Form.Item>

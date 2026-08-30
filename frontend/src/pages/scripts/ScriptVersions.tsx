@@ -58,7 +58,7 @@ export default function ScriptVersions() {
       title={`脚本 #${id} 版本历史`}
       extra={<Button onClick={() => navigate(`/scripts/${id}`)}>返回脚本</Button>}
     >
-      <Space style={{ marginBottom: 16 }}>
+      <Space style={{ marginBottom: 24 }}>
         <Select value={left} onChange={setLeft} options={opts} style={{ width: 110 }} placeholder="左版本" />
         <span>对比</span>
         <Select value={right} onChange={setRight} options={opts} style={{ width: 110 }} placeholder="右版本" />

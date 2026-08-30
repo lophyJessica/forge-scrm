@@ -246,7 +246,7 @@ export default function CollectionTasks() {
 
   return (
     <Card title="自动采集任务" extra={<Button type="primary" onClick={openModal}>新建采集任务</Button>}>
-      <Form form={queryForm} layout="inline" style={{ marginBottom: 16 }} onFinish={() => load(1)}>
+      <Form form={queryForm} layout="inline" style={{ marginBottom: 24 }} onFinish={() => load(1)}>
         <Form.Item name="status">
           <Select allowClear placeholder="任务状态" style={{ width: 150 }} options={Object.keys(STATUS_LABEL).map((value) => ({ label: STATUS_LABEL[value], value }))} />
         </Form.Item>
