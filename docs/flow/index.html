@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Forge SCRM 产品结构图与核心流程</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 40px 24px;
+      background: #0f172a;
+      color: #e2e8f0;
+      line-height: 1.8
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 800
+    }
+
+    h2 {
+      font-size: 20px;
+      color: #38bdf8;
+      margin-top: 40px;
+      border-left: 3px solid #38bdf8;
+      padding-left: 12px
+    }
+
+    h3 {
+      margin-top: 28px;
+      color: #cbd5e1
+    }
+
+    blockquote {
+      background: rgba(56, 189, 248, .08);
+      border-left: 3px solid #38bdf8;
+      padding: 12px 18px;
+      margin: 16px 0;
+      color: #94a3b8
+    }
+
+    pre {
+      background: #1e293b;
+      border-radius: 12px;
+      padding: 24px;
+      overflow: visible;
+      border: 1px solid rgba(255, 255, 255, .08)
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0
+    }
+
+    th {
+      background: #334155;
+      padding: 10px 14px;
+      text-align: left
+    }
+
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, .06)
+    }
+
+    tr:hover td {
+      background: rgba(255, 255, 255, .03)
+    }
+
+    .mermaid-wrap {
+      position: relative;
+      margin: 16px 0;
+      background: #1e293b;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, .08)
+    }
+
+    .mermaid-wrap .controls {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      gap: 4px;
+      padding: 8px;
+      background: rgba(30, 41, 59, .95);
+      border-radius: 12px 12px 0 0;
+      border-bottom: 1px solid rgba(255, 255, 255, .06)
+    }
+
+    .mermaid-wrap .controls button {
+      background: rgba(255, 255, 255, .1);
+      border: 1px solid rgba(255, 255, 255, .15);
+      color: #e2e8f0;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all .2s
+    }
+
+    .mermaid-wrap .controls button:hover {
+      background: rgba(56, 189, 248, .2);
+      border-color: #38bdf8
+    }
+
+    .mermaid-wrap .svg-stage {
+      height: 600px;
+      overflow: auto;
+      padding: 24px;
+      text-align: center
+    }
+
+    .mermaid-wrap[data-is-td="true"] .svg-stage {
+      height: auto;
+      overflow: visible;
+      padding: 24px;
+      text-align: center
+    }
+
+    .mermaid-wrap .svg-stage svg {
+      max-width: none
+    }
+
+    a {
+      color: #38bdf8
+    }
+
+    .load-error {
+      color: #fca5a5;
+      background: #18181b;
+      border: 1px solid #ef4444;
+      border-radius: 8px;
+      padding: 16px
+    }
+  </style>
+</head>
+
+<body>
+  <div id="content"></div>
+  <script>
+    mermaid.initialize({ startOnLoad: false, theme: 'dark', themeVariables: { primaryColor: '#1e3a5f', primaryTextColor: '#e2e8f0', primaryBorderColor: '#38bdf8', lineColor: '#64748b', secondaryColor: '#1e293b', tertiaryColor: '#0f172a' } });
+
+    fetch('flowchart.md?t=' + Date.now())
+      .then(response => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.text();
+      })
+      .then(async md => {
+        document.getElementById('content').innerHTML = marked.parse(md);
+
+        const mermaidNodes = document.querySelectorAll('.language-mermaid');
+
+        for (let i = 0; i < mermaidNodes.length; i++) {
+          const node = mermaidNodes[i];
+          const source = node.textContent || '';
+          try {
+            await mermaid.parse(source);
+          } catch (err) {
+            console.error('Mermaid parse failed:', err);
+            const errBox = document.createElement('pre');
+            errBox.className = 'load-error';
+            errBox.textContent = `Mermaid 图表 #${i + 1} 解析失败：${String(err)}`;
+            node.parentNode.insertBefore(errBox, node);
+          }
+        }
+
+        mermaidNodes.forEach(node => {
+          if (node.closest('.mermaid-wrap')) return;
+          const source = node.textContent || '';
+          const isTD = /^\s*(flowchart|graph)\s+TD/i.test(source);
+          const targetNode = node.tagName === 'CODE' && node.parentElement && node.parentElement.tagName === 'PRE'
+            ? node.parentElement
+            : node;
+
+          const wrap = document.createElement('div');
+          wrap.className = 'mermaid-wrap';
+          if (isTD) wrap.setAttribute('data-is-td', 'true');
+
+          const stage = document.createElement('div');
+          stage.className = 'svg-stage';
+          targetNode.parentNode.insertBefore(wrap, targetNode);
+          stage.appendChild(targetNode);
+          wrap.appendChild(stage);
+        });
+
+        return mermaid.run({ querySelector: '.language-mermaid' });
+      })
+      .then(() => {
+        document.querySelectorAll('.mermaid-wrap').forEach(wrap => {
+          if (wrap.getAttribute('data-is-td') === 'true') return;
+          const stage = wrap.querySelector('.svg-stage');
+          const svg = stage && stage.querySelector('svg');
+          if (!stage || !svg) return;
+
+          let currentScale = 1.0;
+          let baseWidth = 0;
+          let aspectRatio = 1.0;
+
+          function initDimensions() {
+            if (baseWidth) return;
+            const rect = svg.getBoundingClientRect();
+            baseWidth = rect.width;
+            const viewBox = svg.getAttribute('viewBox');
+            if (viewBox) {
+              const parts = viewBox.split(' ').map(Number);
+              if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
+                aspectRatio = parts[3] / parts[2];
+                return;
+              }
+            }
+            if (rect.width > 0) aspectRatio = rect.height / rect.width;
+          }
+
+          const controls = document.createElement('div');
+          controls.className = 'controls';
+          const btnOut = document.createElement('button');
+          btnOut.type = 'button';
+          btnOut.textContent = '-';
+          btnOut.title = '缩小';
+          const btnReset = document.createElement('button');
+          btnReset.type = 'button';
+          btnReset.textContent = '1:1';
+          btnReset.title = '恢复原始比例';
+          const btnIn = document.createElement('button');
+          btnIn.type = 'button';
+          btnIn.textContent = '+';
+          btnIn.title = '放大';
+          controls.appendChild(btnOut);
+          controls.appendChild(btnReset);
+          controls.appendChild(btnIn);
+          wrap.insertBefore(controls, stage);
+
+          function updateZoom(reset = false) {
+            initDimensions();
+            if (reset) {
+              svg.style.width = '';
+              svg.style.height = 'auto';
+              btnReset.textContent = '1:1';
+              return;
+            }
+            const newWidth = baseWidth * currentScale;
+            svg.style.width = `${newWidth}px`;
+            svg.style.height = `${newWidth * aspectRatio}px`;
+            btnReset.textContent = `${currentScale.toFixed(1)}x`;
+          }
+
+          btnOut.addEventListener('click', () => {
+            currentScale = Math.max(0.3, currentScale - 0.2);
+            updateZoom();
+          });
+          btnReset.addEventListener('click', () => {
+            currentScale = 1.0;
+            updateZoom(true);
+          });
+          btnIn.addEventListener('click', () => {
+            currentScale = Math.min(5.0, currentScale + 0.2);
+            updateZoom();
+          });
+        });
+      })
+      .catch(err => {
+        console.error('Document render failed:', err);
+        document.getElementById('content').innerHTML = `<div class="load-error">无法加载 flowchart.md：${String(err)}</div>`;
+      });
+  </script>
+</body>
+
+</html>
